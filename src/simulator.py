@@ -167,7 +167,7 @@ class Simulator:
 
             allowed, reason = check_position_limit(
                 signal.recommended_size,
-                self._bankroll,
+                self._max_bankroll,
                 self._position_cap_pct,
             )
             if not allowed:
