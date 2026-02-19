@@ -1,0 +1,56 @@
+[project]
+name = "polymarket-weather-bot"
+version = "0.1.0"
+description = "NOAA-vs-Polymarket weather contract mispricing detector"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "py-clob-client>=0.0.1",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "httpx>=0.27",
+    "typer>=0.12",
+    "structlog>=24.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
+
+[project.scripts]
+weather-bot = "src.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "pyright>=1.1",
+    "python-dotenv>=1.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/models.py" = ["TCH003"]  # Pydantic models need runtime imports
+"src/resolver.py" = ["TCH001"]  # Resolver functions use these imports at runtime
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+# Allow Unknown types when wrapping untyped py-clob-client and JSON API responses
+reportUnknownMemberType = "warning"
+reportUnknownVariableType = "warning"
+reportUnknownArgumentType = "warning"
+reportUnnecessaryIsInstance = "warning"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
