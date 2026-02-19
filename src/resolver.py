@@ -94,7 +94,7 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
             continue
 
         # Determine if trade won or lost
-        outcome, actual_pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=observation,
             metric=str(market_data["metric"]),
@@ -102,7 +102,7 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
             comparison=str(market_data["comparison"]),
         )
 
-        if outcome is None or actual_pnl is None:
+        if result.outcome is None or result.actual_pnl is None:
             logger.warning(
                 "could_not_calculate_outcome",
                 trade_id=trade.trade_id,
@@ -110,11 +110,16 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
             )
             continue
 
+        outcome = result.outcome
+        actual_pnl = result.actual_pnl
+
         # Update journal with resolution
         success = journal.update_trade_resolution(
             trade_id=trade.trade_id,
             outcome=outcome,
             actual_pnl=actual_pnl,
+            actual_value=result.actual_value,
+            actual_value_unit=result.actual_value_unit,
         )
 
         if success:
@@ -150,13 +155,31 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
     }
 
 
+class _OutcomeResult:
+    """Result of trade outcome calculation."""
+
+    __slots__ = ("outcome", "actual_pnl", "actual_value", "actual_value_unit")
+
+    def __init__(
+        self,
+        outcome: str | None,
+        actual_pnl: Decimal | None,
+        actual_value: float | None,
+        actual_value_unit: str,
+    ) -> None:
+        self.outcome = outcome
+        self.actual_pnl = actual_pnl
+        self.actual_value = actual_value
+        self.actual_value_unit = actual_value_unit
+
+
 def _calculate_outcome(
     trade: Trade,
     observation: NOAAObservation,
     metric: str,
     threshold: float,
     comparison: str,
-) -> tuple[str, Decimal] | tuple[None, None]:
+) -> _OutcomeResult:
     """Calculate if a trade won or lost based on actual observed weather.
 
     Args:
@@ -167,20 +190,24 @@ def _calculate_outcome(
         comparison: Comparison type ("above", "below").
 
     Returns:
-        Tuple of (outcome, actual_pnl) where outcome is "won" or "lost",
-        or (None, None) if outcome cannot be determined.
+        _OutcomeResult with outcome, pnl, actual weather value, and unit.
     """
     # Extract the actual value from observation
     actual_value: float | None = None
-    if metric == "temperature_high":
-        actual_value = observation.temperature_high
-    elif metric == "temperature_low":
-        actual_value = observation.temperature_low
+    unit = ""
+    if metric in ("temperature_high", "temperature_low"):
+        actual_value = (
+            observation.temperature_high
+            if metric == "temperature_high"
+            else observation.temperature_low
+        )
+        unit = "\u00b0F"
     elif metric in ("precipitation", "snowfall"):
         actual_value = observation.precipitation
+        unit = "in"
 
     if actual_value is None:
-        return None, None
+        return _OutcomeResult(None, None, None, "")
 
     # Determine if condition was met
     condition_met = False
@@ -188,20 +215,21 @@ def _calculate_outcome(
         condition_met = actual_value > threshold
     elif comparison == "below":
         condition_met = actual_value < threshold
+    else:
+        # Unsupported comparison type (e.g. "between")
+        return _OutcomeResult(None, None, actual_value, unit)
 
     # Determine win/loss based on trade side
     won = condition_met if trade.side == "YES" else not condition_met
 
     # Calculate P&L
+    # trade.price is always the YES price. For NO trades, actual cost = 1 - yes_price.
+    cost = trade.price if trade.side == "YES" else Decimal("1") - trade.price
     if won:
         outcome = "won"
-        # YES @ 0.60: if resolves to 1.00, P&L = (1.00 - 0.60) * size
-        # NO @ 0.40: if resolves to 0.00, P&L = (1.00 - 0.40) * size
-        actual_pnl = (Decimal("1.00") - trade.price) * trade.size
+        actual_pnl = (Decimal("1") - cost) * trade.size
     else:
         outcome = "lost"
-        # YES @ 0.60: if resolves to 0.00, P&L = (0.00 - 0.60) * size
-        # NO @ 0.40: if resolves to 1.00, P&L = (0.00 - 0.40) * size
-        actual_pnl = (Decimal("0.00") - trade.price) * trade.size
+        actual_pnl = -cost * trade.size
 
-    return outcome, actual_pnl
+    return _OutcomeResult(outcome, actual_pnl, actual_value, unit)

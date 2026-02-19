@@ -57,7 +57,7 @@ class TestCalculateOutcome:
         trade = _make_trade(side="YES", price="0.60", size="25.00")
         obs = _make_observation(temp_high=80.0)
 
-        outcome, pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=obs,
             metric="temperature_high",
@@ -65,15 +65,17 @@ class TestCalculateOutcome:
             comparison="above",
         )
 
-        assert outcome == "won"
-        assert pnl == Decimal("10.00")  # (1.00 - 0.60) * 25
+        assert result.outcome == "won"
+        assert result.actual_pnl == Decimal("10.00")  # (1.00 - 0.60) * 25
+        assert result.actual_value == 80.0
+        assert result.actual_value_unit == "\u00b0F"
 
     def test_yes_trade_loses_when_condition_not_met(self) -> None:
         """YES trade on 'above' loses when actual temp below threshold."""
         trade = _make_trade(side="YES", price="0.60", size="25.00")
         obs = _make_observation(temp_high=70.0)
 
-        outcome, pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=obs,
             metric="temperature_high",
@@ -81,15 +83,16 @@ class TestCalculateOutcome:
             comparison="above",
         )
 
-        assert outcome == "lost"
-        assert pnl == Decimal("-15.00")  # (0.00 - 0.60) * 25
+        assert result.outcome == "lost"
+        assert result.actual_pnl == Decimal("-15.00")  # (0.00 - 0.60) * 25
+        assert result.actual_value == 70.0
 
     def test_no_trade_wins_when_condition_not_met(self) -> None:
         """NO trade on 'above' wins when actual temp below threshold."""
         trade = _make_trade(side="NO", price="0.40", size="25.00")
         obs = _make_observation(temp_high=70.0)
 
-        outcome, pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=obs,
             metric="temperature_high",
@@ -97,15 +100,15 @@ class TestCalculateOutcome:
             comparison="above",
         )
 
-        assert outcome == "won"
-        assert pnl == Decimal("15.00")  # (1.00 - 0.40) * 25
+        assert result.outcome == "won"
+        assert result.actual_pnl == Decimal("10.00")  # NO cost = 1 - 0.40 = 0.60; (1 - 0.60) * 25
 
     def test_no_trade_loses_when_condition_met(self) -> None:
         """NO trade on 'above' loses when actual temp exceeds threshold."""
         trade = _make_trade(side="NO", price="0.40", size="25.00")
         obs = _make_observation(temp_high=80.0)
 
-        outcome, pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=obs,
             metric="temperature_high",
@@ -113,15 +116,15 @@ class TestCalculateOutcome:
             comparison="above",
         )
 
-        assert outcome == "lost"
-        assert pnl == Decimal("-10.00")  # (0.00 - 0.40) * 25
+        assert result.outcome == "lost"
+        assert result.actual_pnl == Decimal("-15.00")  # NO cost = 1 - 0.40 = 0.60; -0.60 * 25
 
     def test_below_comparison(self) -> None:
         """Correctly handles 'below' comparison."""
         trade = _make_trade(side="YES", price="0.50", size="20.00")
         obs = _make_observation(temp_low=30.0)
 
-        outcome, pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=obs,
             metric="temperature_low",
@@ -129,15 +132,17 @@ class TestCalculateOutcome:
             comparison="below",
         )
 
-        assert outcome == "won"
-        assert pnl == Decimal("10.00")  # (1.00 - 0.50) * 20
+        assert result.outcome == "won"
+        assert result.actual_pnl == Decimal("10.00")  # (1.00 - 0.50) * 20
+        assert result.actual_value == 30.0
+        assert result.actual_value_unit == "\u00b0F"
 
     def test_precipitation_uses_actual_inches(self) -> None:
         """Precipitation uses actual measured inches, not PoP."""
         trade = _make_trade(side="YES", price="0.50", size="20.00")
         obs = _make_observation(precipitation=0.5)
 
-        outcome, pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=obs,
             metric="precipitation",
@@ -145,14 +150,16 @@ class TestCalculateOutcome:
             comparison="above",
         )
 
-        assert outcome == "won"
+        assert result.outcome == "won"
+        assert result.actual_value == 0.5
+        assert result.actual_value_unit == "in"
 
     def test_returns_none_when_no_data(self) -> None:
-        """Returns (None, None) when observation lacks required metric."""
+        """Returns None outcome when observation lacks required metric."""
         trade = _make_trade()
         obs = _make_observation(temp_high=None, temp_low=None)
 
-        outcome, pnl = _calculate_outcome(
+        result = _calculate_outcome(
             trade=trade,
             observation=obs,
             metric="temperature_high",
@@ -160,8 +167,27 @@ class TestCalculateOutcome:
             comparison="above",
         )
 
-        assert outcome is None
-        assert pnl is None
+        assert result.outcome is None
+        assert result.actual_pnl is None
+        assert result.actual_value is None
+
+    def test_between_comparison_returns_none(self) -> None:
+        """Unsupported 'between' comparison returns None outcome."""
+        trade = _make_trade(side="NO", price="0.40")
+        obs = _make_observation(temp_high=72.0)
+
+        result = _calculate_outcome(
+            trade=trade,
+            observation=obs,
+            metric="temperature_high",
+            threshold=75.0,
+            comparison="between",
+        )
+
+        assert result.outcome is None
+        assert result.actual_pnl is None
+        # actual_value should still be extracted even though comparison fails
+        assert result.actual_value == 72.0
 
 
 class TestResolveTradesSkipsFuture:

@@ -5,7 +5,12 @@ from __future__ import annotations
 import collections
 import json
 import logging
+from contextlib import asynccontextmanager
 from datetime import date, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 from decimal import Decimal
 from pathlib import Path
 from threading import Lock
@@ -66,7 +71,18 @@ structlog.configure(
 
 logger = structlog.get_logger()
 
-app = FastAPI(title="Weather Edge Tracker")
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Run trade context backfill once at server startup."""
+    journal = Journal()
+    try:
+        journal.backfill_trade_context()
+    finally:
+        journal.close()
+    yield
+
+
+app = FastAPI(title="Weather Edge Tracker", lifespan=_lifespan)
 
 
 class _Encoder(json.JSONEncoder):
@@ -127,6 +143,10 @@ def _enrich_signals(
             d["event_date"] = market.event_date.isoformat()
             d["metric"] = market.metric
             d["threshold"] = market.threshold
+            # Compute potential payout for display
+            price = float(d.get("market_price", 0))
+            size = float(d.get("recommended_size", 0))
+            d["potential_payout"] = round((1.0 - price) * size, 2)
         enriched.append(d)
     return enriched
 
@@ -143,11 +163,11 @@ def index() -> FileResponse:
 
 @app.get("/api/status")
 def get_status() -> JSONResponse:
-    """Return current config + unresolved trade count."""
+    """Return current config + lifecycle counts."""
     settings = _load_settings()
     journal = Journal()
     try:
-        unresolved = journal.get_unresolved_trades()
+        lifecycle = journal.get_lifecycle_counts()
         return _json({
             "max_bankroll": settings.max_bankroll,
             "position_cap_pct": settings.position_cap_pct,
@@ -156,7 +176,11 @@ def get_status() -> JSONResponse:
             "daily_loss_limit_pct": settings.daily_loss_limit_pct,
             "kill_switch": settings.kill_switch,
             "log_level": settings.log_level,
-            "unresolved_trades": len(unresolved),
+            "unresolved_trades": lifecycle["open"] + lifecycle["ready"],
+            "open_bets": lifecycle["open"],
+            "ready_to_resolve": lifecycle["ready"],
+            "resolved_count": lifecycle["resolved"],
+            "total_trades": lifecycle["total"],
         })
     finally:
         journal.close()
@@ -273,6 +297,43 @@ def run_sim() -> JSONResponse:
         sim.close()
 
 
+@app.post("/api/sim/execute")
+async def run_sim_execute(request: Request) -> JSONResponse:
+    """Execute paper trades for selected market IDs only (bet slip confirm).
+
+    Accepts JSON body with {"market_ids": ["id1", "id2", ...]}.
+    Scans markets, filters signals to only the selected IDs, and executes.
+    """
+    body = await request.json()
+    market_ids: list[str] = body.get("market_ids", [])
+    if not market_ids:
+        return JSONResponse(status_code=400, content={"error": "No market_ids provided"})
+
+    settings = _load_settings()
+    sim = _make_simulator(settings)
+    try:
+        signals = sim.run_scan()
+        selected = [s for s in signals if s.market_id in market_ids]
+        if not selected:
+            return _json({
+                "trades": [],
+                "skipped": len(market_ids),
+                "message": "None of the selected markets had actionable signals.",
+            })
+        trades = sim.execute_signals(selected)
+        return _json({
+            "trades": [t.model_dump() for t in trades],
+            "signals": _enrich_signals(selected, sim),
+            "skipped": len(market_ids) - len(trades),
+            "message": f"Placed {len(trades)} bet(s).",
+        })
+    except Exception as e:
+        logger.error("sim_execute_failed", error=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        sim.close()
+
+
 @app.post("/api/resolve")
 def run_resolve() -> JSONResponse:
     """Resolve unresolved trades against actual weather. Equivalent to `cli resolve`."""
@@ -346,22 +407,43 @@ def get_report(days: int = 30) -> JSONResponse:
         journal.close()
 
 
+@app.get("/api/portfolio")
+def get_portfolio() -> JSONResponse:
+    """Get computed portfolio state from trade history."""
+    settings = _load_settings()
+    journal = Journal()
+    try:
+        summary = journal.get_portfolio_summary(Decimal(str(settings.max_bankroll)))
+        return _json(summary)
+    finally:
+        journal.close()
+
+
+@app.get("/api/trades/{trade_id}")
+def get_trade_detail(trade_id: str) -> JSONResponse:
+    """Get a single trade with full market context."""
+    journal = Journal()
+    try:
+        detail = journal.get_trade_detail(trade_id)
+        if detail is None:
+            return JSONResponse(status_code=404, content={"error": "Trade not found"})
+        return _json(detail)
+    finally:
+        journal.close()
+
+
 @app.get("/api/trades")
 def get_trades(
     days: int = 90,
     status: str | None = None,
     outcome: str | None = None,
 ) -> JSONResponse:
-    """Get trade history with optional filters."""
+    """Get trade history with market context and lifecycle state."""
     journal = Journal()
     try:
-        trades = journal.get_trade_history(days)
-        if status:
-            trades = [t for t in trades if t.status == status]
-        if outcome:
-            trades = [t for t in trades if t.outcome == outcome]
+        trades = journal.get_trades_with_context(days, status, outcome)
         return _json({
-            "trades": [t.model_dump() for t in trades],
+            "trades": trades,
             "count": len(trades),
         })
     finally:

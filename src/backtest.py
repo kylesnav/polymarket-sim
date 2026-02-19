@@ -230,12 +230,14 @@ class Backtester:
         # Determine win/loss
         won = condition_met if side == "YES" else not condition_met
 
+        # historical_price is always the YES price. For NO trades, cost = 1 - yes_price.
+        cost = historical_price if side == "YES" else Decimal("1") - historical_price
         if won:
             outcome = "won"
-            actual_pnl = (Decimal("1.00") - historical_price) * recommended_size
+            actual_pnl = (Decimal("1") - cost) * recommended_size
         else:
             outcome = "lost"
-            actual_pnl = (Decimal("0.00") - historical_price) * recommended_size
+            actual_pnl = -cost * recommended_size
 
         trade = BacktestTrade(
             market_id=market.market_id,

@@ -68,6 +68,21 @@ CREATE TABLE IF NOT EXISTS markets (
 )
 """
 
+# Context columns added to the trades table for human-readable display.
+_CONTEXT_COLUMNS = [
+    ("question", "TEXT DEFAULT ''"),
+    ("location", "TEXT DEFAULT ''"),
+    ("event_date_ctx", "TEXT DEFAULT ''"),
+    ("metric", "TEXT DEFAULT ''"),
+    ("threshold", "REAL DEFAULT 0"),
+    ("comparison", "TEXT DEFAULT ''"),
+    ("actual_value", "REAL DEFAULT NULL"),
+    ("actual_value_unit", "TEXT DEFAULT ''"),
+    ("noaa_forecast_high", "REAL DEFAULT NULL"),
+    ("noaa_forecast_low", "REAL DEFAULT NULL"),
+    ("noaa_forecast_narrative", "TEXT DEFAULT ''"),
+]
+
 
 class Journal:
     """SQLite-backed trade journal.
@@ -86,6 +101,7 @@ class Journal:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
         self._create_tables()
+        self._ensure_context_columns()
         logger.info("journal_initialized", db_path=str(db_path))
 
     def _create_tables(self) -> None:
@@ -97,22 +113,81 @@ class Journal:
         cursor.execute(CREATE_MARKETS_TABLE)
         self._conn.commit()
 
-    def log_trade(self, trade: Trade) -> bool:
+    def _ensure_context_columns(self) -> None:
+        """Add context columns to trades table if they don't exist."""
+        cursor = self._conn.cursor()
+        for col_name, col_type in _CONTEXT_COLUMNS:
+            try:
+                cursor.execute(f"ALTER TABLE trades ADD COLUMN {col_name} {col_type}")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+        self._conn.commit()
+
+    def backfill_trade_context(self) -> None:
+        """Backfill context columns from markets cache for existing trades."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """UPDATE trades SET
+                   question = COALESCE(
+                       (SELECT 'Will ' || m.location || ' ' ||
+                        REPLACE(REPLACE(REPLACE(REPLACE(m.metric,
+                            'temperature_high', 'high temp'),
+                            'temperature_low', 'low temp'),
+                            'precipitation', 'precipitation'),
+                            'snowfall', 'snowfall') ||
+                        ' be ' || m.comparison || ' ' ||
+                        CAST(m.threshold AS TEXT) || ' on ' || m.event_date
+                        FROM markets m WHERE m.market_id = trades.market_id),
+                       question),
+                   location = COALESCE(
+                       (SELECT m.location FROM markets m WHERE m.market_id = trades.market_id),
+                       location),
+                   event_date_ctx = COALESCE(
+                       (SELECT m.event_date FROM markets m WHERE m.market_id = trades.market_id),
+                       event_date_ctx),
+                   metric = COALESCE(
+                       (SELECT m.metric FROM markets m WHERE m.market_id = trades.market_id),
+                       metric),
+                   threshold = COALESCE(
+                       (SELECT m.threshold FROM markets m WHERE m.market_id = trades.market_id),
+                       threshold),
+                   comparison = COALESCE(
+                       (SELECT m.comparison FROM markets m WHERE m.market_id = trades.market_id),
+                       comparison)
+               WHERE location = '' AND EXISTS (
+                   SELECT 1 FROM markets m WHERE m.market_id = trades.market_id
+               )"""
+        )
+        if cursor.rowcount > 0:
+            logger.info("backfilled_trade_context", count=cursor.rowcount)
+        self._conn.commit()
+
+    def log_trade(
+        self,
+        trade: Trade,
+        market_context: dict[str, object] | None = None,
+    ) -> bool:
         """Log a trade to the database.
 
         Args:
             trade: Trade record to log.
+            market_context: Optional market metadata (question, location,
+                event_date, metric, threshold, comparison) to store alongside.
 
         Returns:
             True if logged successfully, False on error.
         """
+        ctx = market_context or {}
         try:
             cursor = self._conn.cursor()
             cursor.execute(
                 """INSERT INTO trades
                    (trade_id, market_id, side, price, size,
-                    noaa_probability, edge, timestamp, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    noaa_probability, edge, timestamp, status,
+                    question, location, event_date_ctx, metric, threshold, comparison,
+                    noaa_forecast_high, noaa_forecast_low, noaa_forecast_narrative)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     trade.trade_id,
                     trade.market_id,
@@ -123,6 +198,15 @@ class Journal:
                     str(trade.edge),
                     trade.timestamp.isoformat(),
                     trade.status,
+                    str(ctx.get("question", "")),
+                    str(ctx.get("location", "")),
+                    str(ctx.get("event_date", "")),
+                    str(ctx.get("metric", "")),
+                    float(ctx.get("threshold", 0)),  # type: ignore[arg-type]
+                    str(ctx.get("comparison", "")),
+                    ctx.get("noaa_forecast_high"),
+                    ctx.get("noaa_forecast_low"),
+                    str(ctx.get("noaa_forecast_narrative", "")),
                 ),
             )
             self._conn.commit()
@@ -171,7 +255,12 @@ class Journal:
             return False
 
     def update_trade_resolution(
-        self, trade_id: str, outcome: str, actual_pnl: Decimal
+        self,
+        trade_id: str,
+        outcome: str,
+        actual_pnl: Decimal,
+        actual_value: float | None = None,
+        actual_value_unit: str = "",
     ) -> bool:
         """Update a trade with resolution outcome and actual P&L.
 
@@ -179,6 +268,8 @@ class Journal:
             trade_id: ID of the trade to resolve.
             outcome: "won" or "lost".
             actual_pnl: Actual profit/loss from the trade.
+            actual_value: The actual observed weather value.
+            actual_value_unit: Unit for the actual value (e.g. "°F", "in").
 
         Returns:
             True if updated successfully.
@@ -186,8 +277,11 @@ class Journal:
         try:
             cursor = self._conn.cursor()
             cursor.execute(
-                "UPDATE trades SET status = ?, outcome = ?, actual_pnl = ? WHERE trade_id = ?",
-                ("resolved", outcome, str(actual_pnl), trade_id),
+                """UPDATE trades
+                   SET status = ?, outcome = ?, actual_pnl = ?,
+                       actual_value = ?, actual_value_unit = ?
+                   WHERE trade_id = ?""",
+                ("resolved", outcome, str(actual_pnl), actual_value, actual_value_unit, trade_id),
             )
             self._conn.commit()
             return True
@@ -294,13 +388,13 @@ class Journal:
         Returns:
             List of Trade records.
         """
-        cutoff = datetime.now(tz=UTC).isoformat()
+        now = datetime.now(tz=UTC).isoformat()
         cursor = self._conn.cursor()
         cursor.execute(
             """SELECT * FROM trades
                WHERE timestamp >= date(?, ?)
                ORDER BY timestamp DESC""",
-            (cutoff, f"-{days} days"),
+            (now, f"-{days} days"),
         )
         rows = cursor.fetchall()
         trades: list[Trade] = []
@@ -321,6 +415,235 @@ class Journal:
                 )
             )
         return trades
+
+    def get_trades_with_context(
+        self,
+        days: int = 90,
+        status: str | None = None,
+        outcome: str | None = None,
+    ) -> list[dict[str, object]]:
+        """Get trades with market context and lifecycle state.
+
+        Args:
+            days: Number of days of history.
+            status: Optional status filter.
+            outcome: Optional outcome filter.
+
+        Returns:
+            List of enriched trade dicts with lifecycle field.
+        """
+        now = datetime.now(tz=UTC).isoformat()
+        cursor = self._conn.cursor()
+
+        query = """SELECT * FROM trades
+                   WHERE timestamp >= date(?, ?)"""
+        params: list[object] = [now, f"-{days} days"]
+
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if outcome:
+            query += " AND outcome = ?"
+            params.append(outcome)
+
+        query += " ORDER BY timestamp DESC"
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        today = date.today()
+        result: list[dict[str, object]] = []
+        for row in rows:
+            trade_dict = self._row_to_context_dict(row, today)
+            result.append(trade_dict)
+        return result
+
+    def get_trade_detail(self, trade_id: str) -> dict[str, object] | None:
+        """Get a single trade with full context.
+
+        Args:
+            trade_id: Trade ID to look up.
+
+        Returns:
+            Enriched trade dict or None if not found.
+        """
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT * FROM trades WHERE trade_id = ?", (trade_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_context_dict(row, date.today())
+
+    def get_lifecycle_counts(self) -> dict[str, int]:
+        """Get counts of trades by lifecycle state.
+
+        Returns:
+            Dict with open, ready, resolved, total counts.
+        """
+        today = date.today().isoformat()
+        cursor = self._conn.cursor()
+
+        cursor.execute(
+            """SELECT
+                   SUM(CASE
+                       WHEN status = 'filled'
+                           AND event_date_ctx != ''
+                           AND event_date_ctx > ?
+                       THEN 1 ELSE 0
+                   END) AS open_bets,
+                   SUM(CASE
+                       WHEN status = 'filled'
+                           AND event_date_ctx != ''
+                           AND event_date_ctx <= ?
+                       THEN 1 ELSE 0
+                   END) AS ready,
+                   SUM(CASE
+                       WHEN status = 'filled'
+                           AND event_date_ctx = ''
+                       THEN 1 ELSE 0
+                   END) AS unknown,
+                   SUM(CASE
+                       WHEN status = 'resolved'
+                       THEN 1 ELSE 0
+                   END) AS resolved,
+                   COUNT(*) AS total
+               FROM trades
+               WHERE status IN ('filled', 'resolved')""",
+            (today, today),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return {"open": 0, "ready": 0, "resolved": 0, "total": 0}
+
+        return {
+            "open": int(row["open_bets"] or 0) + int(row["unknown"] or 0),
+            "ready": int(row["ready"] or 0),
+            "resolved": int(row["resolved"] or 0),
+            "total": int(row["total"] or 0),
+        }
+
+    def get_portfolio_summary(self, starting_bankroll: Decimal) -> dict[str, object]:
+        """Compute portfolio state from trade history.
+
+        Derives cash, exposure, and P&L from the trades table rather than
+        relying on ephemeral in-memory state.
+
+        Args:
+            starting_bankroll: The starting bankroll amount.
+
+        Returns:
+            Dict with cash, exposure, total_value, actual_pnl, and lifecycle counts.
+        """
+        cursor = self._conn.cursor()
+
+        # Sum of sizes for non-resolved filled trades (money at risk)
+        cursor.execute(
+            "SELECT COALESCE(SUM(CAST(size AS REAL)), 0) FROM trades WHERE status = 'filled'"
+        )
+        exposure = Decimal(str(cursor.fetchone()[0]))
+
+        # Sum of actual P&L from resolved trades
+        cursor.execute(
+            "SELECT COALESCE(SUM(CAST(actual_pnl AS REAL)), 0) "
+            "FROM trades WHERE status = 'resolved'"
+        )
+        realized_pnl = Decimal(str(cursor.fetchone()[0]))
+
+        cash = starting_bankroll - exposure + realized_pnl
+        total_value = cash + exposure
+
+        lifecycle = self.get_lifecycle_counts()
+
+        return {
+            "starting_bankroll": starting_bankroll,
+            "cash": cash,
+            "exposure": exposure,
+            "total_value": total_value,
+            "actual_pnl": realized_pnl,
+            **lifecycle,
+        }
+
+    def _row_to_context_dict(
+        self, row: sqlite3.Row, today: date
+    ) -> dict[str, object]:
+        """Convert a trades table row to an enriched dict with lifecycle.
+
+        Args:
+            row: SQLite row from the trades table.
+            today: Current date for lifecycle computation.
+
+        Returns:
+            Dict with all trade fields, market context, and lifecycle state.
+        """
+        status = str(row["status"])
+        event_date_str = str(row["event_date_ctx"]) if row["event_date_ctx"] else ""
+
+        # Compute lifecycle
+        if status == "resolved":
+            lifecycle = "resolved"
+        elif status in ("filled", "pending") and event_date_str:
+            event_dt = date.fromisoformat(event_date_str)
+            lifecycle = "open" if event_dt > today else "ready"
+        else:
+            lifecycle = "open"  # Unknown event date treated as open
+
+        # Compute days until/since event
+        days_until: int | None = None
+        if event_date_str:
+            try:
+                event_dt = date.fromisoformat(event_date_str)
+                days_until = (event_dt - today).days
+            except ValueError:
+                pass
+
+        # Compute potential payout
+        side = str(row["side"])
+        price = Decimal(str(row["price"]))
+        size = Decimal(str(row["size"]))
+        effective_price = price if side == "YES" else (Decimal("1") - price)
+        potential_payout = (Decimal("1") - effective_price) * size
+
+        return {
+            "trade_id": str(row["trade_id"]),
+            "market_id": str(row["market_id"]),
+            "side": str(row["side"]),
+            "price": price,
+            "size": size,
+            "noaa_probability": Decimal(str(row["noaa_probability"])),
+            "edge": Decimal(str(row["edge"])),
+            "timestamp": str(row["timestamp"]),
+            "status": status,
+            "outcome": str(row["outcome"]) if row["outcome"] else None,
+            "actual_pnl": Decimal(str(row["actual_pnl"])) if row["actual_pnl"] else None,
+            "question": str(row["question"]) if row["question"] else "",
+            "location": str(row["location"]) if row["location"] else "",
+            "event_date": event_date_str,
+            "metric": str(row["metric"]) if row["metric"] else "",
+            "threshold": float(row["threshold"]) if row["threshold"] else 0.0,
+            "comparison": str(row["comparison"]) if row["comparison"] else "",
+            "lifecycle": lifecycle,
+            "days_until_event": days_until,
+            "potential_payout": potential_payout,
+            "actual_value": (
+                float(row["actual_value"])
+                if row["actual_value"] is not None else None
+            ),
+            "actual_value_unit": (
+                str(row["actual_value_unit"])
+                if row["actual_value_unit"] else ""
+            ),
+            "noaa_forecast_high": (
+                float(row["noaa_forecast_high"])
+                if row["noaa_forecast_high"] is not None else None
+            ),
+            "noaa_forecast_low": (
+                float(row["noaa_forecast_low"])
+                if row["noaa_forecast_low"] is not None else None
+            ),
+            "noaa_forecast_narrative": (
+                str(row["noaa_forecast_narrative"])
+                if row["noaa_forecast_narrative"] else ""
+            ),
+        }
 
     def get_snapshots(self, days: int = 60) -> list[dict[str, object]]:
         """Get daily snapshots for the last N days.

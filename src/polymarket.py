@@ -450,12 +450,12 @@ def _parse_weather_question(
     """
     q_lower = question.lower()
 
-    # Find location
+    # Find location — sort by length (longest first) so "las vegas" matches before "la"
     location = ""
     lat = 0.0
     lon = 0.0
-    for city, coords in CITY_COORDS.items():
-        if city in q_lower:
+    for city, coords in sorted(CITY_COORDS.items(), key=lambda x: len(x[0]), reverse=True):
+        if re.search(rf"\b{re.escape(city)}\b", q_lower):
             location = city.title()
             lat, lon = coords
             break
@@ -463,20 +463,28 @@ def _parse_weather_question(
     if not location:
         return None
 
-    # Determine metric
+    # Determine metric — check precip/snow FIRST to avoid "below" matching "low"
     metric: MetricType = "temperature_high"
-    if "low temp" in q_lower or "temperature low" in q_lower or "low" in q_lower:
-        metric = "temperature_low"
-    elif "precip" in q_lower or "rain" in q_lower:
+    if "precip" in q_lower or "rain" in q_lower:
         metric = "precipitation"
     elif "snow" in q_lower:
         metric = "snowfall"
+    elif "low temp" in q_lower or "temperature low" in q_lower or re.search(r"\blow\b", q_lower):
+        metric = "temperature_low"
     elif "high temp" in q_lower or "high" in q_lower:
         metric = "temperature_high"
 
-    # Extract threshold number (e.g., "75°F", "0.1 inches", "32 degrees")
+    # Extract threshold number — prefer numbers with unit markers to avoid matching dates
     threshold = 0.0
-    threshold_match = re.search(r"(\d+\.?\d*)\s*°?[fFcC]?\b", question)
+    # Try specific patterns first: "75°F", "0.1 inches", "32 degrees"
+    threshold_match = re.search(
+        r"(\d+\.?\d*)\s*(?:°[fFcC]|degrees|inches|in\b)", question
+    )
+    if not threshold_match:
+        # Fallback: number after "above/below/exceed/over/under/reach"
+        threshold_match = re.search(
+            r"(?:above|below|exceed|over|under|reach|than)\s+(\d+\.?\d*)", q_lower
+        )
     if threshold_match:
         threshold = float(threshold_match.group(1))
 
@@ -489,12 +497,23 @@ def _parse_weather_question(
 
     # Extract date
     event_date: date | None = None
+    today = date.today()
     date_pattern = r"(?:on\s+)?(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?"
     for match in re.finditer(date_pattern, question, re.IGNORECASE):
         month_str = match.group(1).lower()
         if month_str in MONTHS:
             day = int(match.group(2))
-            year = int(match.group(3)) if match.group(3) else datetime.now(tz=UTC).year
+            if match.group(3):
+                year = int(match.group(3))
+            else:
+                # Infer year: if the date would be >6 months in the past, use next year
+                year = today.year
+                try:
+                    candidate = date(year, MONTHS[month_str], day)
+                except ValueError:
+                    continue
+                if (today - candidate).days > 180:
+                    year += 1
             try:
                 event_date = date(year, MONTHS[month_str], day)
             except ValueError:
@@ -520,7 +539,10 @@ def _parse_datetime(date_str: str) -> datetime | None:
         return None
     for fmt in ["%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"]:
         try:
-            return datetime.strptime(date_str, fmt).replace(tzinfo=UTC)
+            parsed = datetime.strptime(date_str, fmt)
+            if parsed.tzinfo is not None:
+                return parsed.astimezone(UTC)
+            return parsed.replace(tzinfo=UTC)
         except ValueError:
             continue
     return None

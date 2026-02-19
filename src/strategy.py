@@ -228,7 +228,7 @@ def _temperature_probability(forecast: NOAAForecast, market: WeatherMarket) -> f
     # Choose std dev based on forecast horizon
     from datetime import date as date_cls
 
-    days_out = (market.event_date - date_cls.today()).days
+    days_out = max(0, (market.event_date - date_cls.today()).days)
     if days_out <= 1:
         std_dev = TEMP_STD_DEV_1DAY
     elif days_out <= 2:

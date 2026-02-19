@@ -148,17 +148,36 @@ body::before {
 .tab-description { color: var(--text-2); font-size: 0.82rem; line-height: 1.6; margin-bottom: 20px; }
 
 /* ── Cards ── */
-.cards-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 20px; }
+.cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
 .card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 18px 20px; position: relative; overflow: hidden;
+  padding: 18px 20px; position: relative; overflow: hidden; cursor: default;
+  transition: border-color 0.2s;
 }
-.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--blue), transparent); opacity: 0.5; }
+.card:hover { border-color: var(--border); }
+.card.clickable { cursor: pointer; }
+.card.clickable:hover { border-color: var(--amber-border); background: var(--bg-card-hover); }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.6; }
+.card.accent-green::before { background: linear-gradient(90deg, var(--green), transparent); }
+.card.accent-amber::before { background: linear-gradient(90deg, var(--amber), transparent); }
+.card.accent-blue::before { background: linear-gradient(90deg, var(--blue), transparent); }
+.card.accent-pnl::before { background: linear-gradient(90deg, var(--green), var(--blue), transparent); }
 .card-label { font-size: 0.7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
 .card-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
 .card-value.positive { color: var(--green); }
 .card-value.negative { color: var(--red); }
 .card-sub { font-size: 0.75rem; color: var(--text-2); margin-top: 4px; }
+
+/* ── Next Steps Banner ── */
+.next-steps {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 24px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px;
+  font-size: 0.85rem; line-height: 1.5;
+}
+.next-steps-icon { font-size: 1.4rem; flex-shrink: 0; }
+.next-steps-text { flex: 1; color: var(--text-2); }
+.next-steps-text strong { color: var(--text-1); }
+.next-steps .action-btn { flex-shrink: 0; font-size: 0.75rem; padding: 6px 16px; }
 
 /* ── Chart ── */
 .chart-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
@@ -178,7 +197,7 @@ body::before {
   display: flex; align-items: center; gap: 8px;
 }
 .action-btn:hover { border-color: var(--blue); background: var(--bg-card-hover); }
-.action-btn.loading { opacity: 0.5; pointer-events: none; }
+.action-btn.loading, .action-btn:disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
 .action-btn.loading::after {
   content: ''; width: 12px; height: 12px; border: 2px solid var(--text-3);
   border-top-color: var(--blue); border-radius: 50%; animation: spin 0.6s linear infinite;
@@ -186,6 +205,8 @@ body::before {
 @keyframes spin { to { transform: rotate(360deg); } }
 .action-btn.primary { border-color: var(--blue-border); background: var(--blue-bg); color: var(--blue); }
 .action-btn.primary:hover { background: rgba(77,142,255,0.15); }
+.action-btn.amber { border-color: var(--amber-border); background: var(--amber-bg); color: var(--amber); }
+.action-btn.amber:hover { background: rgba(255,184,0,0.15); }
 .action-output {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 14px 20px; margin-bottom: 20px; font-size: 0.8rem; line-height: 1.6;
@@ -203,21 +224,18 @@ thead th { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em;
 thead th:last-child { text-align: right; }
 tbody td { padding: 10px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; color: var(--text-2); }
 tbody td:last-child { text-align: right; }
-tbody tr { transition: background 0.15s; }
-tbody tr:hover { background: rgba(77,142,255,0.02); }
+tbody tr { transition: background 0.15s; cursor: pointer; }
+tbody tr:hover { background: rgba(77,142,255,0.03); }
 tbody tr:last-child td { border-bottom: none; }
-.empty-row td { text-align: center !important; color: var(--text-3); padding: 24px 12px; }
+.empty-row td { text-align: center !important; color: var(--text-3); padding: 24px 12px; cursor: default; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .badge-yes { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
 .badge-no { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
-.badge-high { background: var(--green-bg); color: var(--green); }
-.badge-med { background: var(--amber-bg); color: var(--amber); }
-.badge-low { background: var(--blue-bg); color: var(--blue); }
-.badge-pending { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
-.badge-filled { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
-.badge-resolved { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-.badge-won { background: var(--green-bg); color: var(--green); }
-.badge-lost { background: var(--red-bg); color: var(--red); }
+.badge-open { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.badge-ready { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.badge-resolved { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+.badge-won { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.badge-lost { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
 .edge-strong { color: var(--green); font-weight: 600; }
 .edge-marginal { color: var(--amber); font-weight: 600; }
 .val-pos { color: var(--green); }
@@ -260,8 +278,47 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── Modal ── */
 .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
 .modal-overlay.open { opacity: 1; pointer-events: auto; }
-.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; width: 460px; max-height: 80vh; overflow-y: auto; padding: 28px; transform: translateY(20px); transition: transform 0.25s; }
+.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; width: 520px; max-width: 92vw; max-height: 80vh; overflow-y: auto; padding: 28px; transform: translateY(20px); transition: transform 0.25s; }
 .modal-overlay.open .modal { transform: translateY(0); }
+.modal-close { position: absolute; top: 16px; right: 16px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-3); font-size: 1rem; cursor: pointer; display: grid; place-items: center; transition: all 0.2s; }
+.modal-close:hover { color: var(--text-1); border-color: var(--text-3); }
+.modal-title { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; margin-bottom: 20px; padding-right: 40px; }
+.modal-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); font-size: 0.82rem; }
+.modal-row:last-child { border-bottom: none; }
+.modal-row-label { color: var(--text-3); }
+.modal-row-value { color: var(--text-1); font-weight: 500; text-align: right; }
+.modal-section-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin: 16px 0 8px; font-weight: 600; }
+
+/* ── Lifecycle Section Headers ── */
+.lifecycle-section { margin-bottom: 24px; }
+.lifecycle-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.lifecycle-header h3 { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; }
+.lifecycle-count { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.lifecycle-header.open h3 { color: var(--green); }
+.lifecycle-header.open .lifecycle-count { background: var(--green-bg); color: var(--green); }
+.lifecycle-header.ready h3 { color: var(--amber); }
+.lifecycle-header.ready .lifecycle-count { background: var(--amber-bg); color: var(--amber); }
+.lifecycle-header.resolved h3 { color: var(--blue); }
+.lifecycle-header.resolved .lifecycle-count { background: var(--blue-bg); color: var(--blue); }
+.lifecycle-empty { color: var(--text-3); font-size: 0.8rem; padding: 12px 0; }
+
+/* ── Bet Cards ── */
+.bet-card {
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: center; gap: 16px;
+  cursor: pointer; transition: all 0.15s;
+}
+.bet-card:hover { border-color: var(--blue-border); background: var(--bg-card-hover); }
+.bet-card-main { flex: 1; min-width: 0; }
+.bet-card-desc { font-size: 0.82rem; color: var(--text-1); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bet-card-meta { font-size: 0.72rem; color: var(--text-3); display: flex; gap: 12px; flex-wrap: wrap; }
+.bet-card-money { text-align: right; flex-shrink: 0; }
+.bet-card-stake { font-size: 0.85rem; font-weight: 600; color: var(--text-1); }
+.bet-card-payout { font-size: 0.72rem; color: var(--green); margin-top: 2px; }
+.bet-card-pnl { font-size: 0.85rem; font-weight: 600; }
+.bet-card-countdown { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; font-weight: 500; }
+.countdown-future { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.countdown-ready { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
 
 /* ── Onboarding ── */
 .onboarding { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin-bottom: 24px; }
@@ -329,22 +386,29 @@ tbody tr:last-child td { border-bottom: none; }
 
 <div class="dashboard">
 
+  <!-- ═══ SIM BANNER ═══ -->
+  <div style="background:linear-gradient(90deg,rgba(77,142,255,0.12),rgba(0,230,138,0.08));border:1px solid var(--blue-border);border-radius:var(--radius);padding:10px 20px;margin-bottom:0;display:flex;align-items:center;gap:10px;font-size:0.78rem;color:var(--blue)">
+    <span style="font-size:1.1rem">&#9888;</span>
+    <span><strong>PAPER SIMULATION</strong> — No real funds at risk. All bets use simulated money.</span>
+  </div>
+
   <!-- ═══ TOP BAR ═══ -->
   <header class="topbar">
     <div class="bot-name">Weather Edge Tracker</div>
     <div class="status-badge" id="statusBadge">
       <span class="status-dot"></span>
-      <span id="statusText">Running</span>
+      <span id="statusText">Paper Sim</span>
     </div>
     <div class="topbar-spacer"></div>
     <div class="topbar-stat">
-      <span class="topbar-stat-label">Bankroll</span>
+      <span class="topbar-stat-label">Portfolio</span>
       <span class="topbar-stat-value" id="topBankroll">--</span>
+      <span class="topbar-stat-label" id="topCashExposure" style="margin-top:1px"></span>
     </div>
     <div class="topbar-divider"></div>
     <div class="topbar-stat">
-      <span class="topbar-stat-label">Unresolved</span>
-      <span class="topbar-stat-value" id="topUnresolved">--</span>
+      <span class="topbar-stat-label">Bets</span>
+      <span class="topbar-stat-value" id="topBets">--</span>
     </div>
     <div class="topbar-divider"></div>
     <div class="kill-switch-wrap">
@@ -361,9 +425,9 @@ tbody tr:last-child td { border-bottom: none; }
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
     <button class="tab-btn" data-tab="scan">Scan Markets</button>
-    <button class="tab-btn" data-tab="simulate">Run Simulation</button>
+    <button class="tab-btn" data-tab="simulate">Find &amp; Place Bets</button>
     <button class="tab-btn" data-tab="backtest">Backtest</button>
-    <button class="tab-btn" data-tab="history">Trade History</button>
+    <button class="tab-btn" data-tab="history">My Bets</button>
     <button class="tab-btn" data-tab="logs">Activity Log</button>
     <button class="tab-btn" data-tab="settings">Settings</button>
     <button class="tab-btn" data-tab="how">How It Works</button>
@@ -387,15 +451,15 @@ tbody tr:last-child td { border-bottom: none; }
         </div>
         <div class="step-card">
           <div class="step-num">2</div>
-          <h3>Run a Simulation</h3>
+          <h3>Place Practice Bets</h3>
           <p>When the bot finds a gap between NOAA's forecast and the market price, it places a practice bet with fake money to track performance.</p>
-          <button class="action-btn primary" onclick="switchTab('simulate')">Go to Simulate</button>
+          <button class="action-btn primary" onclick="switchTab('simulate')">Find &amp; Place Bets</button>
         </div>
         <div class="step-card">
           <div class="step-num">3</div>
           <h3>Review Results</h3>
-          <p>After weather events happen, the bot checks if its bets would have won. Track profit/loss over time to see if the strategy works.</p>
-          <button class="action-btn primary" onclick="switchTab('history')">Go to History</button>
+          <p>After weather events happen, resolve your bets to see if they won. Track profit/loss over time to prove the strategy works.</p>
+          <button class="action-btn primary" onclick="switchTab('history')">My Bets</button>
         </div>
       </div>
     </div>
@@ -403,28 +467,30 @@ tbody tr:last-child td { border-bottom: none; }
     <!-- Dashboard content (shown when data exists) -->
     <div id="dashboardContent">
       <div class="cards-row">
-        <div class="card">
-          <div class="card-label">Trades Executed <span class="tip" data-tip="Total practice bets placed by the simulator.">?</span></div>
-          <div class="card-value" id="cardFilled">--</div>
+        <div class="card accent-green">
+          <div class="card-label">Open Bets <span class="tip" data-tip="Bets that have been placed but the weather event hasn't happened yet. Waiting for the outcome.">?</span></div>
+          <div class="card-value" id="cardOpen">--</div>
+          <div class="card-sub" id="cardOpenSub">awaiting weather</div>
         </div>
-        <div class="card">
-          <div class="card-label">Trades Resolved <span class="tip" data-tip="Bets where the weather event already happened and we know the real result.">?</span></div>
+        <div class="card accent-amber clickable" id="cardReadyWrap" onclick="doResolveFromDashboard()">
+          <div class="card-label">Ready to Resolve <span class="tip" data-tip="The weather event already happened for these bets. Click to check outcomes and calculate real P&L.">?</span></div>
+          <div class="card-value" id="cardReady">--</div>
+          <div class="card-sub" style="color:var(--amber)">click to resolve</div>
+        </div>
+        <div class="card accent-blue">
+          <div class="card-label">Resolved <span class="tip" data-tip="Bets that have been settled. We know if they won or lost.">?</span></div>
           <div class="card-value" id="cardResolved">--</div>
+          <div class="card-sub" id="cardResolvedSub"></div>
         </div>
-        <div class="card">
-          <div class="card-label">Simulated P&L <span class="tip" data-tip="Estimated profit/loss based on the edge at time of bet. A projection, not the real outcome.">?</span></div>
-          <div class="card-value" id="cardSimPnl">--</div>
-        </div>
-        <div class="card">
-          <div class="card-label">Actual P&L <span class="tip" data-tip="Real profit/loss calculated after the weather event happened. Did the bet actually win or lose?">?</span></div>
+        <div class="card accent-pnl">
+          <div class="card-label">Actual P&amp;L <span class="tip" data-tip="Real profit or loss from resolved bets. This is the number that matters.">?</span></div>
           <div class="card-value" id="cardActualPnl">--</div>
-        </div>
-        <div class="card">
-          <div class="card-label">Win Rate <span class="tip" data-tip="Percentage of resolved bets that were correct. Above 55% with positive P&L suggests the strategy works.">?</span></div>
-          <div class="card-value" id="cardWinRate">--</div>
-          <div class="card-sub" id="cardWinDetail"></div>
+          <div class="card-sub" id="cardPnlSub"></div>
         </div>
       </div>
+
+      <!-- Next Steps -->
+      <div class="next-steps" id="nextSteps" style="display:none"></div>
 
       <!-- P&L Chart -->
       <div class="chart-section">
@@ -450,7 +516,7 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="report-stat-value" id="reportAvgEdge">--</div>
         </div>
         <div class="report-stat">
-          <div class="report-stat-label">Avg Bet Size <span class="tip" data-tip="Average dollar amount per practice bet.">?</span></div>
+          <div class="report-stat-label">Avg Bet Size</div>
           <div class="report-stat-value" id="reportAvgSize">--</div>
         </div>
         <div class="report-stat">
@@ -497,7 +563,7 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="section-header">
       <div class="section-title">Scan Markets</div>
     </div>
-    <p class="tab-description">Scan Polymarket for active weather contracts and compare prices against NOAA forecasts. The bot looks for gaps where the government forecast disagrees with what the market is charging. No bets are placed &mdash; this just finds opportunities.</p>
+    <p class="tab-description">Scan Polymarket for active weather contracts and compare prices against NOAA forecasts. No bets are placed &mdash; this just finds opportunities.</p>
     <div class="action-bar">
       <button class="action-btn primary" id="scanBtn">Scan Markets</button>
     </div>
@@ -511,15 +577,12 @@ tbody tr:last-child td { border-bottom: none; }
       <table>
         <thead>
           <tr>
-            <th>Weather Question</th>
-            <th>Location</th>
-            <th>Event Date</th>
-            <th>Forecast Prob. <span class="tip" data-tip="NOAA's estimate of how likely this weather event is. Based on free government data.">?</span></th>
-            <th>Market Price <span class="tip" data-tip="What Polymarket charges for a Yes contract. Think of it as the crowd's probability estimate. $0.60 = 60% likely.">?</span></th>
-            <th>Edge <span class="tip" data-tip="The gap between NOAA forecast and market price. Bigger gap = better opportunity.">?</span></th>
-            <th>Bet Side <span class="tip" data-tip="YES means we think the event will happen. NO means we think it won't.">?</span></th>
-            <th>Confidence <span class="tip" data-tip="How big the edge is. High = 20%+ gap, Medium = 15-20%, Low = 10-15%.">?</span></th>
-            <th>Rec. Bet <span class="tip" data-tip="Recommended bet size calculated by the quarter-Kelly formula. Conservative sizing to limit risk.">?</span></th>
+            <th>The Bet</th>
+            <th>NOAA Says</th>
+            <th>Market Says</th>
+            <th>Our Edge</th>
+            <th>Position</th>
+            <th>Risk &amp; Reward</th>
           </tr>
         </thead>
         <tbody id="signalsBody"></tbody>
@@ -532,35 +595,47 @@ tbody tr:last-child td { border-bottom: none; }
   <!-- ═══════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-simulate">
     <div class="section-header">
-      <div class="section-title">Run Simulation</div>
+      <div class="section-title">Find &amp; Place Bets</div>
     </div>
-    <p class="tab-description">Scan for opportunities AND place practice bets in one step. The bot finds weather markets with an edge, calculates bet sizes, and records everything to the trade journal. No real money is used.</p>
+    <p class="tab-description">Scan for weather markets where NOAA disagrees with the crowd. Review opportunities, select which to bet on, then confirm.</p>
     <div class="action-bar">
-      <button class="action-btn primary" id="simBtn">Run Simulation</button>
-      <button class="action-btn" id="resolveBtn">Resolve Past Bets</button>
-      <span class="tip" data-tip="Resolve checks actual weather outcomes for past bets and marks them as won or lost with real P&L.">?</span>
+      <button class="action-btn primary" id="simFindBtn">Find Opportunities</button>
+      <button class="action-btn amber" id="resolveBtn">Resolve Past Bets</button>
+      <span class="tip" data-tip="Checks actual weather outcomes for past bets and marks them as won or lost with real P&L.">?</span>
     </div>
     <div class="action-output" id="simOutput"></div>
 
     <div class="table-section" id="simSignalsSection" style="display:none">
       <div class="section-header">
-        <div class="section-title">Signals Found This Run</div>
+        <div class="section-title">Opportunities Found</div>
+        <div class="section-controls">
+          <button class="pill-btn" id="selectAllBtn">Select All</button>
+        </div>
       </div>
       <table>
         <thead>
           <tr>
-            <th>Weather Question</th>
-            <th>Location</th>
-            <th>Forecast Prob.</th>
-            <th>Market Price</th>
-            <th>Edge</th>
-            <th>Bet Side</th>
-            <th>Confidence</th>
-            <th>Rec. Bet</th>
+            <th style="width:32px"><input type="checkbox" id="checkAll"></th>
+            <th>The Bet</th>
+            <th>NOAA Says</th>
+            <th>Market Says</th>
+            <th>Our Edge</th>
+            <th>Position</th>
+            <th>Risk &amp; Reward</th>
           </tr>
         </thead>
         <tbody id="simSignalsBody"></tbody>
       </table>
+    </div>
+
+    <!-- Bet Slip -->
+    <div id="betSlip" style="display:none;position:sticky;bottom:0;z-index:50;background:var(--bg-card);border:1px solid var(--green-border);border-radius:var(--radius);padding:14px 20px;margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div style="font-size:0.85rem;color:var(--text-1)">
+          <strong id="slipCount">0</strong> bet(s) selected &mdash; <strong id="slipTotal">$0.00</strong> total wagered
+        </div>
+        <button class="action-btn primary" id="placeBetsBtn" style="font-size:0.85rem;padding:10px 24px">Place Bets</button>
+      </div>
     </div>
   </div>
 
@@ -571,19 +646,19 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="section-header">
       <div class="section-title">Backtest Historical Performance</div>
     </div>
-    <p class="tab-description">Test the strategy against weather events that already happened. The bot looks at past markets, checks what NOAA predicted vs. what the market priced, and calculates whether its bets would have won. This may take 30-60 seconds.</p>
+    <p class="tab-description">Test the strategy against weather events that already happened. This may take 30-60 seconds.</p>
     <div class="form-row" style="margin-bottom:14px">
       <div class="form-group">
-        <label class="form-label">Days to Look Back <span class="tip" data-tip="How many days of recently closed markets to analyze. More days = more data but slower.">?</span></label>
+        <label class="form-label">Days to Look Back <span class="tip" data-tip="How many days of recently closed markets to analyze.">?</span></label>
         <input class="form-input" type="number" id="btLookback" value="7" min="1" max="30">
       </div>
       <div class="form-group">
-        <label class="form-label">Price Sample Offset <span class="tip" data-tip="How many days before the event to sample the market price. 2 means 'what was the price 2 days before the weather event?'">?</span></label>
+        <label class="form-label">Price Sample Offset <span class="tip" data-tip="How many days before the event to sample the market price.">?</span></label>
         <input class="form-input" type="number" id="btPriceOffset" value="2" min="1" max="7">
       </div>
     </div>
     <div class="form-group" style="max-width:300px;margin-bottom:14px">
-      <label class="form-label">Simulated Bankroll ($) <span class="tip" data-tip="How much fake money to start with for the backtest.">?</span></label>
+      <label class="form-label">Simulated Bankroll ($)</label>
       <input class="form-input" type="number" id="btBankroll" value="500" step="50">
     </div>
     <div class="action-bar">
@@ -601,12 +676,11 @@ tbody tr:last-child td { border-bottom: none; }
         <table>
           <thead>
             <tr>
-              <th>Location</th>
-              <th>Weather Question</th>
-              <th>Bet Side</th>
-              <th>Market Price</th>
-              <th>Forecast Prob.</th>
-              <th>Edge</th>
+              <th>The Bet</th>
+              <th>Position</th>
+              <th>NOAA Says</th>
+              <th>Market Says</th>
+              <th>Our Edge</th>
               <th>Actual Weather</th>
               <th>Result</th>
               <th>Profit/Loss</th>
@@ -619,46 +693,23 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: TRADE HISTORY                                  -->
+  <!-- TAB: MY BETS                                        -->
   <!-- ═══════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-history">
     <div class="section-header">
-      <div class="section-title">Trade History</div>
-    </div>
-    <p class="tab-description">All practice bets placed by the simulator. Pending bets are awaiting execution, Filled bets are active, and Resolved bets have a known outcome.</p>
-    <div class="table-section">
-      <div class="table-filters">
+      <div class="section-title">My Bets</div>
+      <div class="section-controls">
         <select class="filter-select" id="filterStatus">
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="filled">Filled</option>
+          <option value="">All Bets</option>
+          <option value="open">Open</option>
+          <option value="ready">Ready to Resolve</option>
           <option value="resolved">Resolved</option>
         </select>
-        <select class="filter-select" id="filterOutcome">
-          <option value="">All Outcomes</option>
-          <option value="won">Won</option>
-          <option value="lost">Lost</option>
-        </select>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Market</th>
-            <th>Side</th>
-            <th>Price</th>
-            <th>Bet Size</th>
-            <th>Edge</th>
-            <th>Status</th>
-            <th>Outcome</th>
-            <th>Actual P&L</th>
-            <th>Timestamp</th>
-          </tr>
-        </thead>
-        <tbody id="historyBody"></tbody>
-      </table>
-      <div class="pagination" id="historyPagination"></div>
     </div>
+    <p class="tab-description">Every bet you've placed. Open bets are waiting for weather. Ready bets can be resolved now. Resolved bets show your actual profit or loss.</p>
+
+    <div id="historyLifecycle"></div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
@@ -678,7 +729,7 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="pill-btn active" id="autoScrollBtn">Auto-scroll</button>
       </div>
     </div>
-    <p class="tab-description">Real-time log of bot activity. Shows what the bot is doing as it scans markets, fetches forecasts, and executes trades.</p>
+    <p class="tab-description">Real-time log of bot activity.</p>
     <div class="log-viewer" id="logViewer">
       <div style="color:var(--text-3);text-align:center;padding:20px">Waiting for activity... Run a scan or simulation to see logs here.</div>
     </div>
@@ -691,33 +742,33 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="section-header">
       <div class="section-title">Settings</div>
     </div>
-    <p class="tab-description">Configure how the bot sizes bets, when it trades, and safety limits. Changes are saved to the .env configuration file and take effect on the next scan or simulation.</p>
+    <p class="tab-description">Configure bet sizing, safety limits, and trading rules. Changes take effect on the next scan.</p>
 
     <div class="settings-grid">
       <div>
         <div class="form-group">
-          <label class="form-label">Max Bankroll ($) <span class="tip" data-tip="Total fake money available for practice bets. Real money isn't used until the strategy proves itself over 60+ days.">?</span></label>
+          <label class="form-label">Max Bankroll ($) <span class="tip" data-tip="Total money available for bets.">?</span></label>
           <input class="form-input" type="number" id="cfgBankroll" step="50">
         </div>
         <div class="form-group">
-          <label class="form-label">Position Cap (%) <span class="tip" data-tip="Maximum size of any single bet as a percentage of bankroll. Default 5% means no single bet can be more than $25 on a $500 bankroll.">?</span></label>
+          <label class="form-label">Position Cap (%) <span class="tip" data-tip="Maximum size of any single bet as % of bankroll. 5% on $500 = $25 max per bet.">?</span></label>
           <input class="form-input" type="number" id="cfgPositionCap" step="1">
           <div class="form-hint">As percentage (e.g. 5 = 5%)</div>
         </div>
         <div class="form-group">
-          <label class="form-label">Kelly Fraction <span class="tip" data-tip="The Kelly Criterion is a famous math formula for optimal bet sizing. We use a fraction of it (default 0.25 = 25%) to be extra cautious. Lower = more conservative.">?</span></label>
+          <label class="form-label">Kelly Fraction <span class="tip" data-tip="How aggressively to size bets. 0.25 = conservative quarter-Kelly.">?</span></label>
           <input class="form-input" type="number" id="cfgKelly" step="0.05">
           <div class="form-hint">0.25 = quarter-Kelly (recommended)</div>
         </div>
       </div>
       <div>
         <div class="form-group">
-          <label class="form-label">Min Edge Threshold (%) <span class="tip" data-tip="Minimum gap required between NOAA forecast and market price before the bot considers a bet. Default 10% means the forecast must disagree by at least 10 cents.">?</span></label>
+          <label class="form-label">Min Edge Threshold (%) <span class="tip" data-tip="Minimum gap required before betting. 10% = NOAA must disagree by at least 10 cents.">?</span></label>
           <input class="form-input" type="number" id="cfgMinEdge" step="1">
           <div class="form-hint">As percentage (e.g. 10 = 10%)</div>
         </div>
         <div class="form-group">
-          <label class="form-label">Daily Loss Limit (%) <span class="tip" data-tip="If losses reach this percentage of bankroll in a single day, the bot stops trading for the day. A safety net to prevent bad streaks.">?</span></label>
+          <label class="form-label">Daily Loss Limit (%) <span class="tip" data-tip="Stop trading if losses hit this % of bankroll in a day.">?</span></label>
           <input class="form-input" type="number" id="cfgDailyLoss" step="1">
           <div class="form-hint">As percentage (e.g. 5 = 5%)</div>
         </div>
@@ -734,7 +785,7 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
 
     <div class="modal-kill-row">
-      <span class="modal-kill-label">Emergency Kill Switch <span class="tip" data-tip="When enabled, the bot will not scan or trade. Everything halts immediately. Use this if something looks wrong.">?</span></span>
+      <span class="modal-kill-label">Emergency Kill Switch <span class="tip" data-tip="Halts all bot activity instantly.">?</span></span>
       <label class="kill-toggle">
         <input type="checkbox" id="settingsKillSwitch">
         <span class="kill-track"></span>
@@ -751,89 +802,72 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="how-section">
       <h3>The Strategy</h3>
       <p>NOAA (National Oceanic and Atmospheric Administration) publishes free weather forecasts that are <strong style="color:var(--green)">85&ndash;90% accurate</strong> at 1&ndash;2 day horizons. Polymarket lets anyone bet on weather outcomes &mdash; but casual bettors often misprice these contracts compared to the freely available government data.</p>
-      <p>This bot exploits that gap: it compares NOAA's probability estimate to the market price. When the difference is large enough (10%+ by default), it places a practice bet sized conservatively using the Kelly Criterion.</p>
+      <p>This bot exploits that gap: it compares NOAA's probability estimate to the market price. When the difference is large enough (10%+ by default), it places a bet sized conservatively using the Kelly Criterion.</p>
     </div>
 
     <div class="how-section">
       <h3>Step by Step</h3>
       <div class="flow-diagram">
-        <div class="flow-step">
-          <div class="flow-icon">1</div>
-          <div class="flow-label">Find Weather Bets</div>
-          <div class="flow-detail">Scan Polymarket for temperature, rain, and snow contracts</div>
-        </div>
+        <div class="flow-step"><div class="flow-icon">1</div><div class="flow-label">Find Weather Bets</div><div class="flow-detail">Scan Polymarket for temperature, rain, and snow contracts</div></div>
         <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step">
-          <div class="flow-icon">2</div>
-          <div class="flow-label">Get NOAA Forecast</div>
-          <div class="flow-detail">Free government data for the same location and date</div>
-        </div>
+        <div class="flow-step"><div class="flow-icon">2</div><div class="flow-label">Get NOAA Forecast</div><div class="flow-detail">Free government data for the same location and date</div></div>
         <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step">
-          <div class="flow-icon">3</div>
-          <div class="flow-label">Compare Prices</div>
-          <div class="flow-detail">If NOAA says 70% but market charges 55&cent;, that's a 15% edge</div>
-        </div>
+        <div class="flow-step"><div class="flow-icon">3</div><div class="flow-label">Compare Prices</div><div class="flow-detail">If NOAA says 70% but market charges 55&cent;, that's a 15% edge</div></div>
         <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step">
-          <div class="flow-icon">4</div>
-          <div class="flow-label">Size the Bet</div>
-          <div class="flow-detail">Quarter-Kelly formula decides how much to wager based on edge size</div>
-        </div>
+        <div class="flow-step"><div class="flow-icon">4</div><div class="flow-label">Size the Bet</div><div class="flow-detail">Quarter-Kelly formula decides how much to wager</div></div>
         <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step">
-          <div class="flow-icon">5</div>
-          <div class="flow-label">Track Results</div>
-          <div class="flow-detail">Wait for weather, check if we were right, calculate real P&L</div>
-        </div>
+        <div class="flow-step"><div class="flow-icon">5</div><div class="flow-label">Track Results</div><div class="flow-detail">Wait for weather, check if we were right, calculate real P&amp;L</div></div>
       </div>
     </div>
 
     <div class="how-section">
       <h3>Bet Sizing: Quarter-Kelly</h3>
-      <p>The <strong>Kelly Criterion</strong> is a mathematical formula that determines the optimal bet size based on your edge. It maximizes long-run growth but can be aggressive, so we use only <strong>25% of what Kelly recommends</strong> (quarter-Kelly).</p>
-      <p><strong>Example:</strong> NOAA says 70% chance of rain but the market prices it at 55%. That's a 15% edge. On a $500 bankroll with quarter-Kelly, the formula might recommend a $12 bet. No single bet can exceed 5% of bankroll ($25).</p>
+      <p>The <strong>Kelly Criterion</strong> determines optimal bet size based on your edge. We use only <strong>25% of what Kelly recommends</strong> to be extra cautious.</p>
+      <p><strong>Example:</strong> NOAA says 70% chance of rain but the market prices it at 55%. That's a 15% edge. On a $500 bankroll, the formula might recommend a $12 bet. No single bet can exceed 5% of bankroll ($25).</p>
     </div>
 
     <div class="how-section">
       <h3>Safety Rules</h3>
       <p>These are enforced automatically and cannot be bypassed:</p>
       <table class="glossary-table">
-        <tr><td style="color:var(--green)">Simulation Only</td><td>No real money is used. The bot tracks practice bets until performance is proven over 60+ days.</td></tr>
-        <tr><td style="color:var(--green)">$500 Bankroll Cap</td><td>Total simulated capital is capped. Can be adjusted in Settings.</td></tr>
-        <tr><td style="color:var(--green)">5% Position Cap</td><td>No single bet can exceed 5% of the bankroll ($25 on $500).</td></tr>
-        <tr><td style="color:var(--green)">Quarter-Kelly Only</td><td>Bet sizes are always 25% of what the Kelly formula suggests.</td></tr>
-        <tr><td style="color:var(--green)">10% Min Edge</td><td>Won't bet unless the forecast disagrees with the market by at least 10%.</td></tr>
-        <tr><td style="color:var(--green)">5% Daily Loss Limit</td><td>If losses hit 5% of bankroll in a day, all trading halts.</td></tr>
-        <tr><td style="color:var(--green)">Log Before Execute</td><td>Every bet is logged to the database before it's recorded as filled.</td></tr>
-        <tr><td style="color:var(--red)">Kill Switch</td><td>Emergency stop button that halts all bot activity instantly.</td></tr>
+        <tr><td style="color:var(--green)">Simulation Only</td><td>No real money is used until performance is proven over 60+ days.</td></tr>
+        <tr><td style="color:var(--green)">Bankroll Cap</td><td>Total capital is capped. Adjustable in Settings.</td></tr>
+        <tr><td style="color:var(--green)">5% Position Cap</td><td>No single bet exceeds 5% of bankroll.</td></tr>
+        <tr><td style="color:var(--green)">Quarter-Kelly</td><td>Bet sizes are always 25% of optimal Kelly.</td></tr>
+        <tr><td style="color:var(--green)">10% Min Edge</td><td>Won't bet unless NOAA disagrees with the market by at least 10%.</td></tr>
+        <tr><td style="color:var(--green)">5% Daily Loss Limit</td><td>If losses hit 5% of bankroll in a day, all betting halts.</td></tr>
+        <tr><td style="color:var(--green)">Log Before Execute</td><td>Every bet is logged before it's recorded as placed.</td></tr>
+        <tr><td style="color:var(--red)">Kill Switch</td><td>Emergency stop that halts everything instantly.</td></tr>
       </table>
     </div>
 
     <div class="how-section">
       <h3>Glossary</h3>
       <table class="glossary-table">
-        <tr><td>Backtest</td><td>Replaying the strategy against past weather events to see how it would have performed historically.</td></tr>
-        <tr><td>Bankroll</td><td>Total fake money available for practice bets. Real money isn't used until the strategy proves itself.</td></tr>
-        <tr><td>Confidence</td><td>How large the edge is. High = 20%+ gap, Medium = 15-20%, Low = 10-15%. Bigger gaps are more convincing.</td></tr>
-        <tr><td>Daily Loss Limit</td><td>If losses reach this % of bankroll in a day, the bot stops. A safety net against bad streaks.</td></tr>
-        <tr><td>Edge</td><td>The gap between NOAA's forecast probability and the market price. A 15% edge means the market is 15 cents off from what the data says.</td></tr>
-        <tr><td>Kelly Criterion</td><td>A math formula for optimal bet sizing. Given your edge and the odds, it tells you what fraction of your bankroll to bet. We use quarter-Kelly (25% of optimal) to be extra safe.</td></tr>
-        <tr><td>Kill Switch</td><td>Emergency stop button. When on, the bot won't scan markets or place any bets.</td></tr>
-        <tr><td>Market Price</td><td>What Polymarket charges for a "Yes" contract. $0.60 means the crowd thinks there's a 60% chance the event happens.</td></tr>
-        <tr><td>Min Edge Threshold</td><td>The minimum gap required before the bot considers a bet. Default 10% means NOAA must disagree with the market by at least 10 cents.</td></tr>
-        <tr><td>NOAA</td><td>National Oceanic and Atmospheric Administration. The US government agency that publishes free weather forecasts.</td></tr>
-        <tr><td>P&L</td><td>Profit and Loss. Positive means you made money, negative means you lost money.</td></tr>
-        <tr><td>Polymarket</td><td>A prediction market platform where people bet on real-world events. You buy contracts that pay $1 if the event happens.</td></tr>
-        <tr><td>Position Cap</td><td>Maximum size of any single bet as a % of bankroll. Prevents putting too much on one outcome.</td></tr>
-        <tr><td>Resolve</td><td>The process of checking actual weather outcomes and marking each bet as won or lost with real P&L.</td></tr>
-        <tr><td>Signal</td><td>An opportunity the bot found where NOAA's forecast disagrees with the market price enough to be worth betting on.</td></tr>
-        <tr><td>Simulation</td><td>Running the strategy with fake money to track performance before risking real dollars.</td></tr>
-        <tr><td>Win Rate</td><td>Percentage of bets that were correct. Above 55% with positive P&L generally indicates a working strategy.</td></tr>
+        <tr><td>Backtest</td><td>Replaying the strategy against past weather events to see historical performance.</td></tr>
+        <tr><td>Bankroll</td><td>Total money available for bets.</td></tr>
+        <tr><td>Edge</td><td>The gap between NOAA's forecast and the market price. A 15% edge means the market is 15 cents off from what the data says.</td></tr>
+        <tr><td>Kelly Criterion</td><td>Math formula for optimal bet sizing. We use quarter-Kelly (25%) to be safe.</td></tr>
+        <tr><td>Kill Switch</td><td>Emergency stop. When on, no scanning or betting happens.</td></tr>
+        <tr><td>NOAA</td><td>National Oceanic and Atmospheric Administration. US government weather forecasts.</td></tr>
+        <tr><td>Open Bet</td><td>A bet that's been placed but the weather event hasn't happened yet.</td></tr>
+        <tr><td>P&amp;L</td><td>Profit and Loss. Positive = you made money.</td></tr>
+        <tr><td>Polymarket</td><td>A prediction market where people bet on real-world events. Contracts pay $1 if the event happens.</td></tr>
+        <tr><td>Ready to Resolve</td><td>The weather event happened. Click resolve to check if you won or lost.</td></tr>
+        <tr><td>Resolve</td><td>Checking actual weather and marking bets as won or lost with real P&amp;L.</td></tr>
+        <tr><td>Win Rate</td><td>Percentage of resolved bets that were correct. Above 55% with positive P&amp;L = working strategy.</td></tr>
       </table>
     </div>
   </div>
 
+</div>
+
+<!-- ═══ TRADE DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="tradeModal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" id="modalClose">&times;</button>
+    <div id="modalContent"></div>
+  </div>
 </div>
 
 <script>
@@ -841,10 +875,21 @@ tbody tr:last-child td { border-bottom: none; }
 //  API
 // ═══════════════════════════════════════
 
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
 async function api(method, path, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { const j = await res.json(); msg = j.error || msg; } catch {}
+    throw new Error(msg);
+  }
   return res.json();
 }
 
@@ -853,14 +898,13 @@ async function api(method, path, body) {
 // ═══════════════════════════════════════
 
 let statusData = {};
+let portfolioData = {};
 let reportData = {};
 let tradesData = [];
 let snapshotsData = [];
 let signalsData = [];
 let simSignalsData = [];
 let currentRange = 30;
-let historyPage = 1;
-const historyPerPage = 8;
 let logCursor = 0;
 let logAutoScroll = true;
 let logEntries = [];
@@ -884,11 +928,56 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ═══════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════
+
+function formatMetric(metric) {
+  const map = { temperature_high: 'High Temp', temperature_low: 'Low Temp', precipitation: 'Precipitation', snowfall: 'Snowfall' };
+  return map[metric] || metric;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return dateStr; }
+}
+
+function formatThreshold(threshold, metric) {
+  if (threshold == null) return '?';
+  if (metric && (metric.startsWith('temperature') || metric === 'temperature_high' || metric === 'temperature_low')) {
+    return threshold + '\u00b0F';
+  }
+  if (metric === 'precipitation' || metric === 'snowfall') return threshold + ' in';
+  return String(threshold);
+}
+
+function makeBetDescription(s) {
+  if (s.question && s.question.length > 10) return s.question;
+  const loc = s.location || '?';
+  const metric = formatMetric(s.metric || '');
+  const threshold = formatThreshold(s.threshold, s.metric);
+  const eventDate = s.event_date ? formatDate(s.event_date) : '';
+  return `${loc} ${metric} ${s.comparison || 'above'} ${threshold}${eventDate ? ' on ' + eventDate : ''}`;
+}
+
+function countdownText(daysUntil) {
+  if (daysUntil == null) return '';
+  if (daysUntil > 1) return `resolves in ${daysUntil}d`;
+  if (daysUntil === 1) return 'resolves tomorrow';
+  if (daysUntil === 0) return 'resolves today';
+  if (daysUntil === -1) return 'resolved yesterday';
+  return `resolved ${Math.abs(daysUntil)}d ago`;
+}
+
+// ═══════════════════════════════════════
 //  LOAD DATA
 // ═══════════════════════════════════════
 
 async function loadAll() {
-  await Promise.all([loadStatus(), loadReport(), loadTrades(), loadSnapshots()]);
+  await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades(), loadSnapshots()]);
+  renderReport(); // Re-render after snapshots are loaded (fixes race condition)
   updateOnboarding();
 }
 
@@ -897,6 +986,13 @@ async function loadStatus() {
     statusData = await api('GET', '/api/status');
     renderStatus();
   } catch (e) { console.error('status load failed', e); }
+}
+
+async function loadPortfolio() {
+  try {
+    portfolioData = await api('GET', '/api/portfolio');
+    renderPortfolio();
+  } catch (e) { console.error('portfolio load failed', e); }
 }
 
 async function loadReport() {
@@ -908,7 +1004,7 @@ async function loadReport() {
 
 async function loadTrades() {
   try {
-    const data = await api('GET', '/api/trades?days=90');
+    const data = await api('GET', '/api/trades?days=365');
     tradesData = data.trades || [];
     renderHistory();
   } catch (e) { console.error('trades load failed', e); }
@@ -950,21 +1046,22 @@ function renderStatus() {
     settingsKill.checked = true;
   } else {
     badge.classList.remove('halted');
-    text.textContent = 'Running';
+    text.textContent = 'Paper Sim';
     kill.checked = false;
     settingsKill.checked = false;
   }
 
-  document.getElementById('topBankroll').textContent = '$' + (s.max_bankroll || 0).toFixed(0);
-  document.getElementById('topUnresolved').textContent = s.unresolved_trades || 0;
-
-  // Settings form
-  document.getElementById('cfgBankroll').value = s.max_bankroll || 500;
-  document.getElementById('cfgPositionCap').value = ((s.position_cap_pct || 0.05) * 100).toFixed(0);
-  document.getElementById('cfgKelly').value = s.kelly_fraction || 0.25;
-  document.getElementById('cfgMinEdge').value = ((s.min_edge_threshold || 0.1) * 100).toFixed(0);
-  document.getElementById('cfgDailyLoss').value = ((s.daily_loss_limit_pct || 0.05) * 100).toFixed(0);
-  document.getElementById('cfgLogLevel').value = s.log_level || 'INFO';
+  // Settings form — skip if user is editing
+  const settingsGrid = document.querySelector('.settings-grid');
+  const formHasFocus = settingsGrid && settingsGrid.contains(document.activeElement);
+  if (!formHasFocus) {
+    document.getElementById('cfgBankroll').value = s.max_bankroll || 500;
+    document.getElementById('cfgPositionCap').value = ((s.position_cap_pct || 0.05) * 100).toFixed(0);
+    document.getElementById('cfgKelly').value = s.kelly_fraction || 0.25;
+    document.getElementById('cfgMinEdge').value = ((s.min_edge_threshold || 0.1) * 100).toFixed(0);
+    document.getElementById('cfgDailyLoss').value = ((s.daily_loss_limit_pct || 0.05) * 100).toFixed(0);
+    document.getElementById('cfgLogLevel').value = s.log_level || 'INFO';
+  }
 
   // Config bars
   const bars = document.getElementById('configBars');
@@ -981,8 +1078,93 @@ function renderStatus() {
   safety.innerHTML = `
     Kill Switch: <span style="color:var(${s.kill_switch ? '--red' : '--green'})">${s.kill_switch ? 'ENGAGED' : 'OFF'}</span><br>
     Log Level: <span style="color:var(--text-1)">${s.log_level}</span><br>
-    Unresolved: <span style="color:var(--text-1)">${s.unresolved_trades || 0} trades</span>
+    Open Bets: <span style="color:var(--text-1)">${s.open_bets || 0}</span> |
+    Ready: <span style="color:var(--amber)">${s.ready_to_resolve || 0}</span>
   `;
+}
+
+// ═══════════════════════════════════════
+//  RENDER PORTFOLIO
+// ═══════════════════════════════════════
+
+function renderPortfolio() {
+  const p = portfolioData;
+
+  // Topbar
+  const totalVal = p.total_value || p.starting_bankroll || 0;
+  document.getElementById('topBankroll').textContent = '$' + totalVal.toFixed(0);
+  const cash = p.cash || 0;
+  const exposure = p.exposure || 0;
+  document.getElementById('topCashExposure').textContent = `$${cash.toFixed(0)} free / $${exposure.toFixed(0)} at risk`;
+
+  const openCount = p.open || 0;
+  const readyCount = p.ready || 0;
+  const betsEl = document.getElementById('topBets');
+  const parts = [];
+  if (openCount) parts.push(openCount + ' open');
+  if (readyCount) parts.push(readyCount + ' ready');
+  betsEl.textContent = parts.length ? parts.join(' / ') : '0';
+  if (readyCount > 0) betsEl.style.color = 'var(--amber)';
+  else betsEl.style.color = '';
+
+  // Dashboard cards
+  document.getElementById('cardOpen').textContent = openCount;
+  document.getElementById('cardReady').textContent = readyCount;
+  document.getElementById('cardResolved').textContent = p.resolved || 0;
+
+  const actPnl = p.actual_pnl || 0;
+  const actEl = document.getElementById('cardActualPnl');
+  actEl.textContent = (actPnl >= 0 ? '+' : '') + '$' + actPnl.toFixed(2);
+  actEl.className = 'card-value ' + (actPnl >= 0 ? 'positive' : 'negative');
+
+  // Find earliest open event date for next steps
+  renderNextSteps(openCount, readyCount, p.resolved || 0);
+}
+
+function renderNextSteps(openCount, readyCount, resolvedCount) {
+  const el = document.getElementById('nextSteps');
+  if (readyCount > 0) {
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <span class="next-steps-icon" style="color:var(--amber)">&#9888;</span>
+      <span class="next-steps-text"><strong>${readyCount} bet${readyCount > 1 ? 's are' : ' is'} ready to resolve.</strong> The weather happened &mdash; click to check if you won.</span>
+      <button class="action-btn amber" onclick="doResolveFromDashboard()">Resolve Now</button>
+    `;
+  } else if (openCount > 0) {
+    const earliest = tradesData.filter(t => t.lifecycle === 'open' && t.event_date).sort((a, b) => a.event_date.localeCompare(b.event_date))[0];
+    const dateStr = earliest ? earliest.event_date : 'soon';
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <span class="next-steps-icon" style="color:var(--green)">&#9203;</span>
+      <span class="next-steps-text"><strong>${openCount} bet${openCount > 1 ? 's' : ''} open.</strong> Next weather event: ${dateStr}. Come back after to resolve.</span>
+    `;
+  } else if (resolvedCount > 0) {
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <span class="next-steps-icon" style="color:var(--blue)">&#10003;</span>
+      <span class="next-steps-text"><strong>All bets settled.</strong> Find new opportunities to keep testing.</span>
+      <button class="action-btn primary" onclick="switchTab('simulate')">Find &amp; Place Bets</button>
+    `;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function doResolveFromDashboard() {
+  const btn = document.querySelector('#nextSteps .action-btn') || document.getElementById('cardReadyWrap');
+  if (btn) setLoading(btn, true);
+  try {
+    const data = await api('POST', '/api/resolve');
+    if (data.error) {
+      console.error('resolve error', data.error);
+      return;
+    }
+    await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades()]);
+  } catch (e) {
+    console.error('resolve failed', e);
+  } finally {
+    if (btn) setLoading(btn, false);
+  }
 }
 
 // ═══════════════════════════════════════
@@ -992,25 +1174,16 @@ function renderStatus() {
 function renderReport() {
   const r = reportData;
 
-  document.getElementById('cardFilled').textContent = r.filled_trades || 0;
-  document.getElementById('cardResolved').textContent = r.resolved_trades || 0;
+  // Resolved sub info
+  const resolvedSub = document.getElementById('cardResolvedSub');
+  if (r.actual_wins || r.actual_losses) {
+    resolvedSub.textContent = (r.actual_wins || 0) + ' won / ' + (r.actual_losses || 0) + ' lost';
+  }
 
-  const simPnl = r.simulated_pnl || 0;
-  const simEl = document.getElementById('cardSimPnl');
-  simEl.textContent = (simPnl >= 0 ? '+' : '') + '$' + simPnl.toFixed(2);
-  simEl.className = 'card-value ' + (simPnl >= 0 ? 'positive' : 'negative');
-
-  const actPnl = r.actual_pnl || 0;
-  const actEl = document.getElementById('cardActualPnl');
-  actEl.textContent = (actPnl >= 0 ? '+' : '') + '$' + actPnl.toFixed(2);
-  actEl.className = 'card-value ' + (actPnl >= 0 ? 'positive' : 'negative');
-
-  const wr = r.win_rate || 0;
-  const wrEl = document.getElementById('cardWinRate');
-  wrEl.textContent = (wr * 100).toFixed(0) + '%';
-  wrEl.className = 'card-value ' + (wr >= 0.5 ? 'positive' : '');
-  document.getElementById('cardWinDetail').textContent =
-    (r.wins || 0) + 'W / ' + (r.losses || 0) + 'L of ' + (r.filled_trades || 0);
+  const pnlSub = document.getElementById('cardPnlSub');
+  if ((r.actual_wins || 0) + (r.actual_losses || 0) > 0) {
+    pnlSub.textContent = 'Win rate: ' + ((r.actual_win_rate || 0) * 100).toFixed(0) + '%';
+  }
 
   document.getElementById('reportAvgEdge').textContent = ((r.avg_edge || 0) * 100).toFixed(1) + '%';
   document.getElementById('reportAvgSize').textContent = '$' + (r.avg_size || 0).toFixed(2);
@@ -1028,99 +1201,218 @@ function renderReport() {
 }
 
 // ═══════════════════════════════════════
-//  RENDER SIGNALS (shared helper)
+//  RENDER SIGNALS (human-readable)
 // ═══════════════════════════════════════
 
-function renderSignalRows(signals, tbodyId, sectionId) {
+function renderSignalRows(signals, tbodyId, sectionId, withCheckbox) {
   const section = document.getElementById(sectionId);
   const tbody = document.getElementById(tbodyId);
   if (!signals.length) { section.style.display = 'none'; return; }
   section.style.display = '';
   tbody.innerHTML = signals.map(s => {
-    const edgePct = (Math.abs(s.edge) * 100).toFixed(0);
+    const desc = makeBetDescription(s);
+    const noaaPct = (Math.abs(s.noaa_probability || 0) * 100).toFixed(0);
+    const marketPct = (Math.abs(s.market_price || 0) * 100).toFixed(0);
+    const edgePct = (Math.abs(s.edge || 0) * 100).toFixed(0);
     const edgeClass = Math.abs(s.edge) >= 0.15 ? 'edge-strong' : 'edge-marginal';
+    const sideLabel = s.side === 'YES' ? 'Yes, it will' : 'No, it won\'t';
     const sideClass = s.side === 'YES' ? 'badge-yes' : 'badge-no';
-    const confMap = { high: 'badge-high', medium: 'badge-med', low: 'badge-low' };
-    const question = s.question || s.market_id;
-    const location = s.location || '';
-    const eventDate = s.event_date || '';
+    const risk = (s.recommended_size || 0).toFixed(2);
+    const payout = (s.potential_payout || ((1 - (s.market_price || 0)) * (s.recommended_size || 0))).toFixed(2);
+    const cb = withCheckbox ? `<td><input type="checkbox" class="signal-check" data-market-id="${s.market_id}" data-size="${s.recommended_size || 0}" checked></td>` : '';
     return `<tr>
-      <td style="color:var(--text-1);max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${question}">${question.length > 50 ? question.slice(0, 50) + '...' : question}</td>
-      <td>${location}</td>
-      ${sectionId === 'signalsSection' ? `<td>${eventDate}</td>` : ''}
-      <td>${(s.noaa_probability || 0).toFixed(2)}</td>
-      <td>${(s.market_price || 0).toFixed(2)}</td>
-      <td class="${edgeClass}">${s.edge >= 0 ? '+' : ''}${edgePct}%</td>
-      <td><span class="badge ${sideClass}">${s.side}</span></td>
-      <td><span class="badge ${confMap[s.confidence] || 'badge-low'}">${s.confidence}</span></td>
-      <td>$${(s.recommended_size || 0).toFixed(2)}</td>
+      ${cb}
+      <td style="color:var(--text-1);max-width:340px;overflow:hidden;text-overflow:ellipsis" title="${desc}">${desc}</td>
+      <td style="color:var(--green)">${noaaPct}% likely</td>
+      <td>${marketPct}% likely</td>
+      <td class="${edgeClass}">${edgePct}%</td>
+      <td><span class="badge ${sideClass}">${sideLabel}</span></td>
+      <td style="color:var(--text-1)">$${risk} <span style="color:var(--green)">&rarr; win $${payout}</span></td>
     </tr>`;
   }).join('');
+  if (withCheckbox) updateBetSlip();
 }
 
 // ═══════════════════════════════════════
-//  RENDER TRADE HISTORY
+//  RENDER MY BETS (lifecycle grouped)
 // ═══════════════════════════════════════
-
-function getFilteredTrades() {
-  const status = document.getElementById('filterStatus').value;
-  const outcome = document.getElementById('filterOutcome').value;
-  return tradesData.filter(t => {
-    if (status && t.status !== status) return false;
-    if (outcome && t.outcome !== outcome) return false;
-    return true;
-  });
-}
 
 function renderHistory() {
-  const tbody = document.getElementById('historyBody');
-  const filtered = getFilteredTrades();
+  const container = document.getElementById('historyLifecycle');
+  const filter = document.getElementById('filterStatus').value;
 
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No trades yet. Run a simulation to generate trades.</td></tr>';
-    document.getElementById('historyPagination').innerHTML = '';
-    return;
+  const open = tradesData.filter(t => t.lifecycle === 'open');
+  const ready = tradesData.filter(t => t.lifecycle === 'ready');
+  const resolved = tradesData.filter(t => t.lifecycle === 'resolved');
+
+  let html = '';
+
+  // Open Bets
+  if (!filter || filter === 'open') {
+    html += `<div class="lifecycle-section">
+      <div class="lifecycle-header open">
+        <h3>Open Bets</h3>
+        <span class="lifecycle-count">${open.length}</span>
+      </div>`;
+    if (open.length === 0) {
+      html += '<div class="lifecycle-empty">No open bets. Place some bets to get started.</div>';
+    } else {
+      html += open.map(t => renderBetCard(t, 'open')).join('');
+    }
+    html += '</div>';
   }
 
-  const start = (historyPage - 1) * historyPerPage;
-  const page = filtered.slice(start, start + historyPerPage);
-
-  tbody.innerHTML = page.map(t => {
-    const sideClass = t.side === 'YES' ? 'badge-yes' : 'badge-no';
-    const statusClass = 'badge-' + t.status;
-    const outcomeHtml = t.outcome
-      ? `<span class="badge badge-${t.outcome}">${t.outcome}</span>`
-      : '<span style="color:var(--text-3)">\u2014</span>';
-    const pnlHtml = t.actual_pnl != null
-      ? `<span class="${t.actual_pnl >= 0 ? 'val-pos' : 'val-neg'}">${t.actual_pnl >= 0 ? '+' : ''}$${t.actual_pnl.toFixed(2)}</span>`
-      : '<span style="color:var(--text-3)">\u2014</span>';
-    const ts = t.timestamp ? t.timestamp.replace('T', ' ').slice(0, 16) : '';
-    return `<tr>
-      <td style="color:var(--text-1);font-weight:500">${(t.trade_id || '').slice(0, 8)}</td>
-      <td style="color:var(--text-1);max-width:200px;overflow:hidden;text-overflow:ellipsis">${t.market_id || ''}</td>
-      <td><span class="badge ${sideClass}">${t.side}</span></td>
-      <td>$${(t.price || 0).toFixed(2)}</td>
-      <td>$${(t.size || 0).toFixed(2)}</td>
-      <td>${((t.edge || 0) * 100).toFixed(0)}%</td>
-      <td><span class="badge ${statusClass}">${t.status}</span></td>
-      <td>${outcomeHtml}</td>
-      <td>${pnlHtml}</td>
-      <td style="color:var(--text-3)">${ts}</td>
-    </tr>`;
-  }).join('');
-
-  const totalPages = Math.ceil(filtered.length / historyPerPage);
-  const pag = document.getElementById('historyPagination');
-  if (totalPages <= 1) { pag.innerHTML = ''; return; }
-  let html = `<span class="page-info">${filtered.length} trades</span>`;
-  for (let i = 1; i <= totalPages; i++) {
-    html += `<button class="page-btn ${i === historyPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+  // Ready to Resolve
+  if (!filter || filter === 'ready') {
+    html += `<div class="lifecycle-section">
+      <div class="lifecycle-header ready" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px">
+          <h3>Ready to Resolve</h3>
+          <span class="lifecycle-count">${ready.length}</span>
+        </div>
+        ${ready.length > 0 ? '<button class="action-btn amber" style="font-size:0.72rem;padding:4px 14px" onclick="doResolveFromDashboard()">Resolve All</button>' : ''}
+      </div>`;
+    if (ready.length === 0) {
+      html += '<div class="lifecycle-empty">No bets ready to resolve yet. Weather events need to happen first.</div>';
+    } else {
+      html += ready.map(t => renderBetCard(t, 'ready')).join('');
+    }
+    html += '</div>';
   }
-  pag.innerHTML = html;
-  pag.querySelectorAll('.page-btn').forEach(btn => {
-    btn.addEventListener('click', () => { historyPage = parseInt(btn.dataset.page); renderHistory(); });
-  });
+
+  // Resolved
+  if (!filter || filter === 'resolved') {
+    html += `<div class="lifecycle-section">
+      <div class="lifecycle-header resolved">
+        <h3>Resolved</h3>
+        <span class="lifecycle-count">${resolved.length}</span>
+      </div>`;
+    if (resolved.length === 0) {
+      html += '<div class="lifecycle-empty">No resolved bets yet. Resolve ready bets to see results.</div>';
+    } else {
+      html += '<div class="table-section"><table><thead><tr><th>The Bet</th><th>Position</th><th>Bet Size</th><th>Actual Weather</th><th>Result</th><th>Profit/Loss</th></tr></thead><tbody>';
+      html += resolved.map(t => {
+        const desc = t.question || t.location || t.market_id;
+        const sideClass = t.side === 'YES' ? 'badge-yes' : 'badge-no';
+        const outcomeClass = t.outcome === 'won' ? 'badge-won' : 'badge-lost';
+        const pnl = t.actual_pnl != null ? t.actual_pnl : 0;
+        const actualStr = t.actual_value != null ? `${t.actual_value.toFixed(1)}${t.actual_value_unit || ''}` : '--';
+        return `<tr onclick="openTradeModal('${t.trade_id}')">
+          <td style="color:var(--text-1);max-width:300px;overflow:hidden;text-overflow:ellipsis">${desc}</td>
+          <td><span class="badge ${sideClass}">${t.side === 'YES' ? 'Yes' : 'No'}</span></td>
+          <td>$${(t.size || 0).toFixed(2)}</td>
+          <td>${actualStr}</td>
+          <td><span class="badge ${outcomeClass}">${t.outcome || '?'}</span></td>
+          <td><span class="${pnl >= 0 ? 'val-pos' : 'val-neg'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span></td>
+        </tr>`;
+      }).join('');
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
 }
+
+function renderBetCard(t, type) {
+  const desc = t.question || t.location || t.market_id;
+  const sideLabel = t.side === 'YES' ? 'Yes' : 'No';
+  const sideClass = t.side === 'YES' ? 'badge-yes' : 'badge-no';
+  const size = (t.size || 0).toFixed(2);
+  const payout = (t.potential_payout || 0).toFixed(2);
+  const cd = countdownText(t.days_until_event);
+  const cdClass = type === 'ready' ? 'countdown-ready' : 'countdown-future';
+  const metaItems = [t.location || '', t.event_date ? formatDate(t.event_date) : ''].filter(Boolean);
+
+  return `<div class="bet-card" onclick="openTradeModal('${t.trade_id}')">
+    <span class="badge ${sideClass}" style="flex-shrink:0">${sideLabel}</span>
+    <div class="bet-card-main">
+      <div class="bet-card-desc">${desc}</div>
+      <div class="bet-card-meta">${metaItems.map(m => `<span>${m}</span>`).join('')}</div>
+    </div>
+    <div class="bet-card-money">
+      <div class="bet-card-stake">$${size}</div>
+      <div class="bet-card-payout">win up to $${payout}</div>
+    </div>
+    ${cd ? `<span class="bet-card-countdown ${cdClass}">${cd}</span>` : ''}
+  </div>`;
+}
+
+// ═══════════════════════════════════════
+//  TRADE DETAIL MODAL
+// ═══════════════════════════════════════
+
+async function openTradeModal(tradeId) {
+  const overlay = document.getElementById('tradeModal');
+  const content = document.getElementById('modalContent');
+  content.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px">Loading...</div>';
+  overlay.classList.add('open');
+
+  try {
+    const t = await api('GET', '/api/trades/' + tradeId);
+    if (t.error) { content.innerHTML = `<div style="color:var(--red)">${t.error}</div>`; return; }
+
+    const desc = t.question || t.location || t.market_id;
+    const sideLabel = t.side === 'YES' ? 'Yes, it will happen' : 'No, it won\'t happen';
+    const cd = countdownText(t.days_until_event);
+
+    let lifecycleBadge = '';
+    if (t.lifecycle === 'open') lifecycleBadge = '<span class="badge badge-open">Open</span>';
+    else if (t.lifecycle === 'ready') lifecycleBadge = '<span class="badge badge-ready">Ready to Resolve</span>';
+    else if (t.lifecycle === 'resolved') lifecycleBadge = t.outcome === 'won' ? '<span class="badge badge-won">Won</span>' : '<span class="badge badge-lost">Lost</span>';
+
+    let html = `<div class="modal-title">${desc}</div>`;
+    html += `<div style="margin-bottom:16px">${lifecycleBadge} ${cd ? `<span style="color:var(--text-3);font-size:0.75rem;margin-left:8px">${cd}</span>` : ''}</div>`;
+
+    html += '<div class="modal-section-label">Bet Details</div>';
+    html += `<div class="modal-row"><span class="modal-row-label">Position</span><span class="modal-row-value">${sideLabel}</span></div>`;
+    html += `<div class="modal-row"><span class="modal-row-label">Bet Size</span><span class="modal-row-value">$${(t.size || 0).toFixed(2)}</span></div>`;
+    html += `<div class="modal-row"><span class="modal-row-label">Entry Price</span><span class="modal-row-value">$${(t.price || 0).toFixed(2)}</span></div>`;
+    html += `<div class="modal-row"><span class="modal-row-label">Potential Payout</span><span class="modal-row-value" style="color:var(--green)">$${(t.potential_payout || 0).toFixed(2)}</span></div>`;
+
+    html += '<div class="modal-section-label">The Edge</div>';
+    html += `<div class="modal-row"><span class="modal-row-label">NOAA Says</span><span class="modal-row-value" style="color:var(--green)">${((t.noaa_probability || 0) * 100).toFixed(0)}% likely</span></div>`;
+    const marketProb = t.side === 'YES' ? (t.price || 0) : 1 - (t.price || 0);
+    html += `<div class="modal-row"><span class="modal-row-label">Market Says</span><span class="modal-row-value">${(marketProb * 100).toFixed(0)}% likely</span></div>`;
+    html += `<div class="modal-row"><span class="modal-row-label">Our Edge</span><span class="modal-row-value" style="color:var(--green)">${((t.edge || 0) * 100).toFixed(0)}%</span></div>`;
+
+    html += '<div class="modal-section-label">Timeline</div>';
+    const placedDate = t.timestamp ? new Date(t.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+    html += `<div class="modal-row"><span class="modal-row-label">Bet Placed</span><span class="modal-row-value">${placedDate}</span></div>`;
+    html += `<div class="modal-row"><span class="modal-row-label">Weather Event</span><span class="modal-row-value">${t.event_date ? formatDate(t.event_date) : 'Unknown'}</span></div>`;
+
+    // NOAA Forecast at bet time
+    if (t.noaa_forecast_high != null || t.noaa_forecast_low != null || t.noaa_forecast_narrative) {
+      html += '<div class="modal-section-label">NOAA Forecast at Bet Time</div>';
+      if (t.noaa_forecast_high != null) html += `<div class="modal-row"><span class="modal-row-label">Forecast High</span><span class="modal-row-value">${t.noaa_forecast_high.toFixed(0)}\u00b0F</span></div>`;
+      if (t.noaa_forecast_low != null) html += `<div class="modal-row"><span class="modal-row-label">Forecast Low</span><span class="modal-row-value">${t.noaa_forecast_low.toFixed(0)}\u00b0F</span></div>`;
+      if (t.noaa_forecast_narrative) html += `<div class="modal-row"><span class="modal-row-label">Forecast</span><span class="modal-row-value" style="max-width:280px;white-space:normal;text-align:right;line-height:1.4">${escapeHtml(t.noaa_forecast_narrative)}</span></div>`;
+    }
+
+    if (t.lifecycle === 'resolved') {
+      html += '<div class="modal-section-label">Result</div>';
+      const pnl = t.actual_pnl || 0;
+      html += `<div class="modal-row"><span class="modal-row-label">Outcome</span><span class="modal-row-value">${t.outcome === 'won' ? '<span style="color:var(--green)">WON</span>' : '<span style="color:var(--red)">LOST</span>'}</span></div>`;
+      if (t.actual_value != null) {
+        const unit = t.actual_value_unit || '';
+        const thr = formatThreshold(t.threshold, t.metric);
+        html += `<div class="modal-row"><span class="modal-row-label">Actual Weather</span><span class="modal-row-value">${t.actual_value.toFixed(1)}${unit} vs ${thr} threshold</span></div>`;
+      }
+      html += `<div class="modal-row"><span class="modal-row-label">Actual P&L</span><span class="modal-row-value ${pnl >= 0 ? 'val-pos' : 'val-neg'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span></div>`;
+    }
+
+    content.innerHTML = html;
+  } catch (e) {
+    content.innerHTML = `<div style="color:var(--red)">Failed to load trade details.</div>`;
+  }
+}
+
+document.getElementById('modalClose').addEventListener('click', () => {
+  document.getElementById('tradeModal').classList.remove('open');
+});
+document.getElementById('tradeModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
 
 // ═══════════════════════════════════════
 //  CHART
@@ -1202,6 +1494,13 @@ function drawChart() {
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
   grad.addColorStop(0, 'rgba(77,142,255,0.15)');
   grad.addColorStop(1, 'rgba(77,142,255,0)');
+  ctx.beginPath();
+  ctx.moveTo(xPos(0), yPos(values[0]));
+  for (let i = 1; i < data.length; i++) {
+    const x0 = xPos(i - 1), y0 = yPos(values[i - 1]);
+    const x1 = xPos(i), y1 = yPos(values[i]);
+    ctx.bezierCurveTo((x0 + x1) / 2, y0, (x0 + x1) / 2, y1, x1, y1);
+  }
   ctx.lineTo(xPos(data.length - 1), pad.top + chartH);
   ctx.lineTo(xPos(0), pad.top + chartH);
   ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
@@ -1252,6 +1551,7 @@ function hideOutput(id) {
 }
 
 function setLoading(btn, loading) {
+  btn.disabled = loading;
   if (loading) btn.classList.add('loading');
   else btn.classList.remove('loading');
 }
@@ -1271,9 +1571,9 @@ document.getElementById('scanBtn').addEventListener('click', async function() {
       signalsData = data.signals || [];
       localStorage.setItem('lastScanSignals', JSON.stringify(signalsData));
       localStorage.setItem('lastScanTime', new Date().toISOString());
-      renderSignalRows(signalsData, 'signalsBody', 'signalsSection');
+      renderSignalRows(signalsData, 'signalsBody', 'signalsSection', false);
       updateScanTime();
-      showOutput('scanOutput', `<span class="success">Scan complete.</span> Found <span class="info">${data.count}</span> signal(s) above threshold.`);
+      showOutput('scanOutput', `<span class="success">Scan complete.</span> Found <span class="info">${data.count}</span> opportunities.`);
     }
   } catch (e) {
     showOutput('scanOutput', `<span class="error">Scan failed: ${e.message}</span>`);
@@ -1294,31 +1594,88 @@ function updateScanTime() {
 //  ACTIONS: SIMULATE
 // ═══════════════════════════════════════
 
-document.getElementById('simBtn').addEventListener('click', async function() {
+// Step 1: Find opportunities (scan only, no execution)
+document.getElementById('simFindBtn').addEventListener('click', async function() {
   setLoading(this, true);
   hideOutput('simOutput');
+  document.getElementById('betSlip').style.display = 'none';
   try {
-    const data = await api('POST', '/api/sim');
+    const data = await api('POST', '/api/scan');
     if (data.error) {
-      showOutput('simOutput', `<span class="error">Simulation failed: ${data.error}</span>`);
+      showOutput('simOutput', `<span class="error">Scan failed: ${data.error}</span>`);
     } else {
       simSignalsData = data.signals || [];
-      renderSignalRows(simSignalsData, 'simSignalsBody', 'simSignalsSection');
-      const trades = data.trades || [];
-      const portfolio = data.portfolio;
-      let msg = `<span class="success">Simulation complete.</span>\n`;
-      msg += `Signals: <span class="info">${(data.signals || []).length}</span> | Trades executed: <span class="info">${trades.length}</span>`;
-      if (portfolio) {
-        msg += `\nDaily P&L: <span class="${portfolio.daily_pnl >= 0 ? 'success' : 'error'}">$${portfolio.daily_pnl.toFixed(2)}</span>`;
-        msg += ` | Bankroll: <span class="info">$${portfolio.total_value.toFixed(2)}</span>`;
+      if (!simSignalsData.length) {
+        showOutput('simOutput', `<span class="info">No actionable opportunities found right now.</span>`);
+        document.getElementById('simSignalsSection').style.display = 'none';
+      } else {
+        renderSignalRows(simSignalsData, 'simSignalsBody', 'simSignalsSection', true);
+        showOutput('simOutput', `<span class="success">Found ${simSignalsData.length} opportunities.</span> Select which bets to place, then click "Place Bets".`);
       }
-      if (data.message) msg = `<span class="info">${data.message}</span>`;
+    }
+  } catch (e) {
+    showOutput('simOutput', `<span class="error">Scan failed: ${e.message}</span>`);
+  }
+  setLoading(this, false);
+});
+
+// Bet slip: update counts when checkboxes change
+function updateBetSlip() {
+  const checks = document.querySelectorAll('.signal-check:checked');
+  const slip = document.getElementById('betSlip');
+  if (checks.length === 0) { slip.style.display = 'none'; return; }
+  slip.style.display = 'block';
+  let total = 0;
+  checks.forEach(c => { total += parseFloat(c.dataset.size || 0); });
+  document.getElementById('slipCount').textContent = checks.length;
+  document.getElementById('slipTotal').textContent = '$' + total.toFixed(2);
+}
+
+document.addEventListener('change', e => {
+  if (e.target.classList.contains('signal-check') || e.target.id === 'checkAll') {
+    if (e.target.id === 'checkAll') {
+      document.querySelectorAll('.signal-check').forEach(c => { c.checked = e.target.checked; });
+    } else {
+      // Update checkAll state when individual checkbox changes
+      const all = document.querySelectorAll('.signal-check');
+      const checkAllEl = document.getElementById('checkAll');
+      if (checkAllEl) checkAllEl.checked = [...all].every(c => c.checked);
+    }
+    updateBetSlip();
+  }
+});
+
+document.getElementById('selectAllBtn').addEventListener('click', () => {
+  const checks = document.querySelectorAll('.signal-check');
+  const allChecked = [...checks].every(c => c.checked);
+  checks.forEach(c => { c.checked = !allChecked; });
+  document.getElementById('checkAll').checked = !allChecked;
+  updateBetSlip();
+});
+
+// Step 2: Place selected bets
+document.getElementById('placeBetsBtn').addEventListener('click', async function() {
+  const checks = document.querySelectorAll('.signal-check:checked');
+  if (!checks.length) return;
+  const marketIds = [...checks].map(c => c.dataset.marketId);
+  setLoading(this, true);
+  try {
+    const data = await api('POST', '/api/sim/execute', { market_ids: marketIds });
+    if (data.error) {
+      showOutput('simOutput', `<span class="error">Failed: ${data.error}</span>`);
+    } else {
+      const trades = data.trades || [];
+      const totalWagered = trades.reduce((sum, t) => sum + (t.size || 0), 0);
+      let msg = `<span class="success">Placed ${trades.length} bet${trades.length !== 1 ? 's' : ''} totaling $${totalWagered.toFixed(2)}.</span>`;
+      if (data.skipped > 0) msg += ` <span style="color:var(--text-3)">(${data.skipped} skipped)</span>`;
       showOutput('simOutput', msg);
-      await Promise.all([loadReport(), loadTrades(), loadSnapshots()]);
+      document.getElementById('betSlip').style.display = 'none';
+      document.getElementById('simSignalsSection').style.display = 'none';
+      await Promise.all([loadPortfolio(), loadReport(), loadTrades(), loadSnapshots()]);
       updateOnboarding();
     }
   } catch (e) {
-    showOutput('simOutput', `<span class="error">Simulation failed: ${e.message}</span>`);
+    showOutput('simOutput', `<span class="error">Failed: ${e.message}</span>`);
   }
   setLoading(this, false);
 });
@@ -1336,11 +1693,16 @@ document.getElementById('resolveBtn').addEventListener('click', async function()
       showOutput('simOutput', `<span class="error">Resolution failed: ${data.error}</span>`);
     } else {
       let msg = `<span class="success">Resolution complete.</span>\n`;
-      msg += `Resolved: <span class="info">${data.resolved_count}</span> | `;
-      msg += `Wins: <span class="success">${data.wins}</span> | Losses: <span class="error">${data.losses}</span> | `;
-      msg += `P&L: <span class="${data.total_pnl >= 0 ? 'success' : 'error'}">$${(data.total_pnl || 0).toFixed(2)}</span>`;
+      msg += `Resolved: <span class="info">${data.resolved_count}</span>`;
+      if (data.resolved_count > 0) {
+        msg += ` | Won: <span class="success">${data.wins}</span> | Lost: <span class="error">${data.losses}</span>`;
+        msg += ` | P&L: <span class="${data.total_pnl >= 0 ? 'success' : 'error'}">$${(data.total_pnl || 0).toFixed(2)}</span>`;
+      }
+      if (data.skipped_future > 0) {
+        msg += `\n<span style="color:var(--text-3)">${data.skipped_future} bet(s) skipped &mdash; weather hasn't happened yet.</span>`;
+      }
       showOutput('simOutput', msg);
-      await Promise.all([loadStatus(), loadReport(), loadTrades()]);
+      await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades()]);
     }
   } catch (e) {
     showOutput('simOutput', `<span class="error">Resolution failed: ${e.message}</span>`);
@@ -1373,13 +1735,11 @@ document.getElementById('backtestBtn').addEventListener('click', async function(
       } else {
         showOutput('backtestOutput', `<span class="success">Backtest complete.</span> ${trades.length} trades analyzed.`);
 
-        // Caveat
         if (data.caveat) {
           document.getElementById('backtestCaveat').textContent = data.caveat;
           document.getElementById('backtestCaveat').style.display = 'block';
         }
 
-        // Summary
         const summary = document.getElementById('backtestSummary');
         summary.innerHTML = `
           <div class="report-stat"><div class="report-stat-label">Markets Scanned</div><div class="report-stat-value">${data.markets_scanned}</div></div>
@@ -1388,20 +1748,19 @@ document.getElementById('backtestBtn').addEventListener('click', async function(
           <div class="report-stat"><div class="report-stat-label">Total P&L</div><div class="report-stat-value ${data.total_pnl >= 0 ? 'val-pos' : 'val-neg'}">${data.total_pnl >= 0 ? '+' : ''}$${data.total_pnl.toFixed(2)}</div></div>
         `;
 
-        // Table
         const tbody = document.getElementById('backtestBody');
         tbody.innerHTML = trades.map(t => {
+          const desc = t.question || `${t.location || ''} ${formatMetric(t.metric || '')} ${t.comparison || ''} ${t.threshold || ''}`;
           const sideClass = t.side === 'YES' ? 'badge-yes' : 'badge-no';
           const outcomeClass = t.outcome === 'won' ? 'badge-won' : 'badge-lost';
           const edgePct = (Math.abs(t.edge) * 100).toFixed(0);
           const edgeClass = Math.abs(t.edge) >= 0.15 ? 'edge-strong' : 'edge-marginal';
-          return `<tr>
-            <td>${t.location || ''}</td>
-            <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis" title="${t.question || ''}">${(t.question || t.market_id || '').slice(0, 45)}</td>
-            <td><span class="badge ${sideClass}">${t.side}</span></td>
-            <td>$${(t.historical_price || 0).toFixed(2)}</td>
-            <td>${(t.noaa_probability || 0).toFixed(2)}</td>
-            <td class="${edgeClass}">${t.edge >= 0 ? '+' : ''}${edgePct}%</td>
+          return `<tr style="cursor:default">
+            <td style="color:var(--text-1);max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${desc}">${desc}</td>
+            <td><span class="badge ${sideClass}">${t.side === 'YES' ? 'Yes' : 'No'}</span></td>
+            <td style="color:var(--green)">${((t.noaa_probability || 0) * 100).toFixed(0)}%</td>
+            <td>${((t.historical_price || 0) * 100).toFixed(0)}%</td>
+            <td class="${edgeClass}">${edgePct}%</td>
             <td>${(t.actual_value || 0).toFixed(1)}</td>
             <td><span class="badge ${outcomeClass}">${t.outcome}</span></td>
             <td><span class="${t.actual_pnl >= 0 ? 'val-pos' : 'val-neg'}">${t.actual_pnl >= 0 ? '+' : ''}$${t.actual_pnl.toFixed(2)}</span></td>
@@ -1426,6 +1785,7 @@ async function pollLogs() {
     const data = await api('GET', `/api/logs?since=${logCursor}`);
     if (data.logs && data.logs.length > 0) {
       logEntries = logEntries.concat(data.logs);
+      if (logEntries.length > 500) logEntries = logEntries.slice(-500);
       logCursor = data.cursor;
       renderLogs();
     }
@@ -1496,7 +1856,6 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async () =>
   };
   await api('PUT', '/api/settings', body);
   await loadStatus();
-  // Show brief confirmation
   const btn = document.getElementById('saveSettingsBtn');
   const orig = btn.textContent;
   btn.textContent = 'Saved!';
@@ -1508,8 +1867,7 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async () =>
 //  FILTERS & CHART RANGE
 // ═══════════════════════════════════════
 
-document.getElementById('filterStatus').addEventListener('change', () => { historyPage = 1; renderHistory(); });
-document.getElementById('filterOutcome').addEventListener('change', () => { historyPage = 1; renderHistory(); });
+document.getElementById('filterStatus').addEventListener('change', renderHistory);
 
 document.querySelectorAll('.pill-btn[data-range]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1524,12 +1882,11 @@ document.querySelectorAll('.pill-btn[data-range]').forEach(btn => {
 //  INIT
 // ═══════════════════════════════════════
 
-// Restore saved scan results
 const savedSignals = localStorage.getItem('lastScanSignals');
 if (savedSignals) {
   try {
     signalsData = JSON.parse(savedSignals);
-    renderSignalRows(signalsData, 'signalsBody', 'signalsSection');
+    renderSignalRows(signalsData, 'signalsBody', 'signalsSection', false);
   } catch(e) { /* ignore */ }
 }
 updateScanTime();
@@ -1538,6 +1895,11 @@ loadAll();
 setupChartHover();
 window.addEventListener('resize', drawChart);
 pollLogs();
+
+// Auto-refresh status + portfolio every 60s
+setInterval(async () => {
+  await Promise.all([loadStatus(), loadPortfolio()]);
+}, 60000);
 </script>
 </body>
 </html>

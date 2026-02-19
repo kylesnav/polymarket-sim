@@ -73,6 +73,7 @@ class Simulator:
         )
 
         self._last_markets: list[WeatherMarket] = []
+        self._last_forecasts: dict[str, NOAAForecast] = {}
 
         logger.info("simulator_initialized", bankroll=str(bankroll))
 
@@ -101,6 +102,7 @@ class Simulator:
 
         # Fetch NOAA forecasts for each market
         forecasts = self._fetch_forecasts(markets)
+        self._last_forecasts = forecasts
         logger.info("forecasts_fetched", count=len(forecasts))
 
         # Generate signals
@@ -203,7 +205,23 @@ class Simulator:
             )
 
             # LOG BEFORE EXECUTE — safety rail #7
-            logged = self._journal.log_trade(trade)
+            market = market_lookup.get(signal.market_id)
+            context: dict[str, object] | None = None
+            if market:
+                context = {
+                    "question": market.question,
+                    "location": market.location,
+                    "event_date": market.event_date.isoformat(),
+                    "metric": market.metric,
+                    "threshold": market.threshold,
+                    "comparison": market.comparison,
+                }
+                forecast = self._last_forecasts.get(signal.market_id)
+                if forecast:
+                    context["noaa_forecast_high"] = forecast.temperature_high
+                    context["noaa_forecast_low"] = forecast.temperature_low
+                    context["noaa_forecast_narrative"] = forecast.forecast_narrative
+            logged = self._journal.log_trade(trade, market_context=context)
             if not logged:
                 logger.error(
                     "trade_logging_failed_skipping",
@@ -240,15 +258,15 @@ class Simulator:
             )
             trades.append(filled_trade)
 
-            # Update portfolio (simplified: deduct size from cash)
+            # Update portfolio: subtract cash spent, total_value stays same (cash→exposure)
             new_cash = self._portfolio.cash - signal.recommended_size
-            pnl_estimate = signal.edge * signal.recommended_size
             self._portfolio = Portfolio(
                 cash=new_cash,
-                total_value=new_cash,
-                daily_pnl=self._portfolio.daily_pnl + pnl_estimate,
+                total_value=self._portfolio.total_value,
                 starting_bankroll=self._portfolio.starting_bankroll,
             )
+            # Keep bankroll in sync with cash for accurate Kelly sizing
+            self._bankroll = new_cash
 
             logger.info(
                 "paper_trade_executed",

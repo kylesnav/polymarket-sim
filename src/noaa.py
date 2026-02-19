@@ -214,7 +214,15 @@ class NOAAClient:
                     if "degC" in unit or "Cel" in unit:
                         # Convert Celsius to Fahrenheit
                         temps_f.append(value * 9.0 / 5.0 + 32.0)
+                    elif "degF" in unit or "Fah" in unit:
+                        temps_f.append(float(value))
                     else:
+                        logger.warning(
+                            "unknown_temperature_unit",
+                            unit=unit,
+                            value=value,
+                        )
+                        # Assume Fahrenheit as fallback
                         temps_f.append(float(value))
 
             # Extract precipitation
