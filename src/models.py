@@ -44,6 +44,18 @@ class NOAAForecast(BaseModel, frozen=True):
     forecast_narrative: str = ""
 
 
+class NOAAObservation(BaseModel, frozen=True):
+    """Actual observed weather from a NOAA weather station."""
+
+    station_id: str
+    location: str
+    observation_date: date
+    retrieved_at: datetime
+    temperature_high: float | None = None
+    temperature_low: float | None = None
+    precipitation: float | None = None  # inches
+
+
 class Signal(BaseModel, frozen=True):
     """Trading signal from NOAA-vs-market comparison."""
 

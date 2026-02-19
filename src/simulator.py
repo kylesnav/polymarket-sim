@@ -140,6 +140,14 @@ class Simulator:
             market_lookup[market.market_id] = market
 
         for signal in signals:
+            # Check for existing open trade on this market
+            if self._journal.has_open_trade(signal.market_id):
+                logger.info(
+                    "skipping_duplicate_market",
+                    market_id=signal.market_id,
+                )
+                continue
+
             # Pre-execution limit checks
             allowed, reason = check_kill_switch(self._kill_switch)
             if not allowed:

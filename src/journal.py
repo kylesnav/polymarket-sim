@@ -132,6 +132,22 @@ class Journal:
             logger.error("trade_log_failed", trade_id=trade.trade_id, error=str(e))
             return False
 
+    def has_open_trade(self, market_id: str) -> bool:
+        """Check if a market already has an open (pending or filled) trade.
+
+        Args:
+            market_id: Market ID to check.
+
+        Returns:
+            True if an open trade exists for this market.
+        """
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM trades WHERE market_id = ? AND status IN ('pending', 'filled') LIMIT 1",
+            (market_id,),
+        )
+        return cursor.fetchone() is not None
+
     def update_trade_status(self, trade_id: str, status: str) -> bool:
         """Update the status of a trade.
 

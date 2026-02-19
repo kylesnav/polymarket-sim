@@ -6,12 +6,13 @@ to trade thresholds, and calculates real P&L.
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 import structlog
 
 from src.journal import Journal
-from src.models import Trade
+from src.models import NOAAObservation, Trade
 from src.noaa import NOAAClient
 
 logger = structlog.get_logger()
@@ -45,6 +46,8 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
     losses = 0
     total_pnl = Decimal("0")
 
+    skipped = 0
+
     for trade in unresolved:
         # Get market metadata
         market_data = journal.get_market_metadata(trade.market_id)
@@ -56,15 +59,35 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
             )
             continue
 
-        # Fetch actual NOAA weather for the event date
         event_date = market_data["event_date"]
+        if not isinstance(event_date, date):
+            logger.warning(
+                "invalid_event_date",
+                market_id=trade.market_id,
+                event_date=str(event_date),
+            )
+            continue
+
+        # Skip trades whose event date hasn't passed yet
+        today = date.today()
+        if event_date >= today:
+            logger.info(
+                "skipping_future_event",
+                market_id=trade.market_id,
+                trade_id=trade.trade_id,
+                event_date=str(event_date),
+            )
+            skipped += 1
+            continue
+
+        # Fetch actual observed weather from NOAA stations
         lat = float(str(market_data["lat"]))
         lon = float(str(market_data["lon"]))
 
-        forecast = noaa.get_forecast(lat, lon, event_date)  # type: ignore[arg-type]
-        if forecast is None:
+        observation = noaa.get_observations(lat, lon, event_date)
+        if observation is None:
             logger.warning(
-                "forecast_unavailable_for_resolution",
+                "observations_unavailable_for_resolution",
                 market_id=trade.market_id,
                 event_date=str(event_date),
             )
@@ -73,7 +96,7 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
         # Determine if trade won or lost
         outcome, actual_pnl = _calculate_outcome(
             trade=trade,
-            forecast=forecast,
+            observation=observation,
             metric=str(market_data["metric"]),
             threshold=float(market_data["threshold"]),  # type: ignore[arg-type]
             comparison=str(market_data["comparison"]),
@@ -112,6 +135,7 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
     logger.info(
         "resolution_complete",
         resolved_count=resolved_count,
+        skipped_future=skipped,
         wins=wins,
         losses=losses,
         total_pnl=str(total_pnl),
@@ -119,6 +143,7 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
 
     return {
         "resolved_count": resolved_count,
+        "skipped_future": skipped,
         "wins": wins,
         "losses": losses,
         "total_pnl": total_pnl,
@@ -127,16 +152,16 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
 
 def _calculate_outcome(
     trade: Trade,
-    forecast: object,  # NOAAForecast
+    observation: NOAAObservation,
     metric: str,
     threshold: float,
     comparison: str,
 ) -> tuple[str, Decimal] | tuple[None, None]:
-    """Calculate if a trade won or lost based on actual weather.
+    """Calculate if a trade won or lost based on actual observed weather.
 
     Args:
         trade: The trade to evaluate.
-        forecast: NOAA forecast data (NOAAForecast model).
+        observation: Actual NOAA weather station observation data.
         metric: Metric type ("temperature_high", "temperature_low", "precipitation", "snowfall").
         threshold: Threshold value for the event.
         comparison: Comparison type ("above", "below").
@@ -145,23 +170,14 @@ def _calculate_outcome(
         Tuple of (outcome, actual_pnl) where outcome is "won" or "lost",
         or (None, None) if outcome cannot be determined.
     """
-    from src.models import NOAAForecast
-
-    if not isinstance(forecast, NOAAForecast):
-        return None, None
-
-    # Extract the actual value from forecast
+    # Extract the actual value from observation
     actual_value: float | None = None
     if metric == "temperature_high":
-        actual_value = forecast.temperature_high
+        actual_value = observation.temperature_high
     elif metric == "temperature_low":
-        actual_value = forecast.temperature_low
+        actual_value = observation.temperature_low
     elif metric in ("precipitation", "snowfall"):
-        # For precip/snowfall, we'd need to check if it occurred
-        # For now, use PoP as proxy (actual value would come from weather station data)
-        actual_value = forecast.precip_probability
-        if actual_value is not None:
-            actual_value = actual_value * 100  # Convert to percentage for inches comparison
+        actual_value = observation.precipitation
 
     if actual_value is None:
         return None, None
