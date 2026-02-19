@@ -168,6 +168,19 @@ def scan_weather_markets(
     return signals
 
 
+def compute_noaa_probability(forecast: NOAAForecast, market: WeatherMarket) -> float | None:
+    """Public wrapper for NOAA-to-probability conversion.
+
+    Args:
+        forecast: NOAA forecast data.
+        market: Weather market with metric and threshold.
+
+    Returns:
+        Probability estimate (0-1) or None if insufficient data.
+    """
+    return _noaa_to_probability(forecast, market)
+
+
 def _noaa_to_probability(forecast: NOAAForecast, market: WeatherMarket) -> float | None:
     """Convert a NOAA forecast into a probability estimate for a market.
 
