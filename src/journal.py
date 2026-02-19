@@ -300,9 +300,40 @@ class Journal:
                     edge=Decimal(str(row["edge"])),
                     timestamp=datetime.fromisoformat(str(row["timestamp"])),
                     status=row["status"],  # type: ignore[arg-type]
+                    outcome=row["outcome"] if row["outcome"] else None,  # type: ignore[arg-type]
+                    actual_pnl=Decimal(str(row["actual_pnl"])) if row["actual_pnl"] else None,
                 )
             )
         return trades
+
+    def get_snapshots(self, days: int = 60) -> list[dict[str, object]]:
+        """Get daily snapshots for the last N days.
+
+        Args:
+            days: Number of days of snapshots to retrieve.
+
+        Returns:
+            List of snapshot dicts ordered by date ascending.
+        """
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """SELECT * FROM daily_snapshots
+               ORDER BY snapshot_date DESC
+               LIMIT ?""",
+            (days,),
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "snapshot_date": row["snapshot_date"],
+                "cash": row["cash"],
+                "total_value": row["total_value"],
+                "daily_pnl": row["daily_pnl"],
+                "open_positions": row["open_positions"],
+                "trades_today": row["trades_today"],
+            }
+            for row in reversed(rows)
+        ]
 
     def get_report_data(self, days: int = 30) -> dict[str, object]:
         """Get summary report data for the last N days.
