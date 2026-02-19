@@ -141,11 +141,16 @@ class PolymarketClient:
             base_url=GAMMA_API_URL,
             timeout=30.0,
         )
+        self._clob_http = httpx.Client(
+            base_url=host,
+            timeout=30.0,
+        )
         logger.info("polymarket_client_initialized", host=host)
 
     def close(self) -> None:
-        """Close the HTTP client."""
+        """Close HTTP clients."""
         self._http.close()
+        self._clob_http.close()
 
     def get_weather_markets(self) -> list[WeatherMarket]:
         """Fetch weather markets using the Gamma API events endpoint.
@@ -176,11 +181,97 @@ class PolymarketClient:
         logger.info("weather_markets_found", count=len(weather_markets))
         return weather_markets
 
-    def _fetch_events_markets(self, tag_slug: str) -> list[dict[str, Any]]:
+    def get_resolved_weather_markets(self, lookback_days: int = 7) -> list[WeatherMarket]:
+        """Fetch recently resolved (closed) weather markets from Gamma API.
+
+        Args:
+            lookback_days: How many days back to search for resolved markets.
+
+        Returns:
+            List of parsed WeatherMarket objects that have closed.
+        """
+        tag_slugs = ["temperature", "precipitation", "snowfall", "weather"]
+        seen_ids: set[str] = set()
+        weather_markets: list[WeatherMarket] = []
+
+        for tag_slug in tag_slugs:
+            markets = self._fetch_events_markets(tag_slug, closed=True)
+            for market_data in markets:
+                condition_id = str(
+                    market_data.get("conditionId", market_data.get("condition_id", ""))
+                )
+                if not condition_id or condition_id in seen_ids:
+                    continue
+                seen_ids.add(condition_id)
+                parsed = self._try_parse_weather_market(market_data)
+                if parsed is not None:
+                    # Filter by lookback window
+                    days_ago = (date.today() - parsed.event_date).days
+                    if 0 < days_ago <= lookback_days:
+                        weather_markets.append(parsed)
+
+        logger.info("resolved_weather_markets_found", count=len(weather_markets))
+        return weather_markets
+
+    def get_price_history(
+        self, token_id: str, start_ts: int, end_ts: int
+    ) -> list[tuple[int, Decimal]]:
+        """Fetch historical price data for a market token from the CLOB API.
+
+        Args:
+            token_id: The outcome token ID.
+            start_ts: Start timestamp (Unix seconds).
+            end_ts: End timestamp (Unix seconds).
+
+        Returns:
+            List of (timestamp, price) tuples sorted by time.
+        """
+        logger.info(
+            "fetching_price_history",
+            token_id=token_id[:20],
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+
+        try:
+            response = self._clob_http.get(
+                "/prices-history",
+                params={
+                    "market": token_id,
+                    "startTs": start_ts,
+                    "endTs": end_ts,
+                    "fidelity": 60,
+                },
+            )
+            response.raise_for_status()
+            data: Any = response.json()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.warning("price_history_error", token_id=token_id[:20], error=str(e))
+            return []
+
+        prices: list[tuple[int, Decimal]] = []
+        if isinstance(data, dict):
+            history: Any = data.get("history", [])
+            if isinstance(history, list):
+                for entry in history:
+                    if isinstance(entry, dict):
+                        ts = entry.get("t")
+                        price = entry.get("p")
+                        if ts is not None and price is not None:
+                            try:
+                                prices.append((int(ts), Decimal(str(price))))
+                            except (ValueError, InvalidOperation):
+                                continue
+
+        logger.info("price_history_fetched", token_id=token_id[:20], points=len(prices))
+        return sorted(prices, key=lambda x: x[0])
+
+    def _fetch_events_markets(self, tag_slug: str, closed: bool = False) -> list[dict[str, Any]]:
         """Fetch markets nested inside events for a given tag slug.
 
         Args:
             tag_slug: The Gamma API tag slug (e.g., "temperature", "precipitation").
+            closed: If True, fetch closed/resolved markets instead of active ones.
 
         Returns:
             Flat list of market dicts extracted from events.
@@ -197,8 +288,8 @@ class PolymarketClient:
                     "/events",
                     params={
                         "tag_slug": tag_slug,
-                        "active": "true",
-                        "closed": "false",
+                        "active": "false" if closed else "true",
+                        "closed": "true" if closed else "false",
                         "limit": limit,
                         "offset": offset,
                     },
