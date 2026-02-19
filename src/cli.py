@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 import structlog
 import typer
 
-from src.backtest import Backtester
 from src.config import Settings
 from src.journal import Journal
 from src.noaa import NOAAClient
@@ -257,82 +256,6 @@ def report(
         )
     finally:
         journal.close()
-
-
-@app.command()
-def backtest(
-    lookback: int = typer.Option(7, help="Days back to search for resolved markets"),
-    price_offset: int = typer.Option(2, help="Days before event to sample historical price"),
-    bankroll: float = typer.Option(500.0, help="Simulated bankroll in dollars"),
-) -> None:
-    """Backtest algorithm against recently resolved weather markets."""
-    settings = Settings()
-    _configure_logging(settings.log_level)
-
-    logger.info(
-        "starting_backtest",
-        lookback_days=lookback,
-        price_offset_days=price_offset,
-        bankroll=bankroll,
-    )
-
-    backtester = Backtester(
-        bankroll=Decimal(str(bankroll)),
-        min_edge=Decimal(str(settings.min_edge_threshold)),
-        kelly_fraction=Decimal(str(settings.kelly_fraction)),
-        position_cap_pct=Decimal(str(settings.position_cap_pct)),
-        lookback_days=lookback,
-        price_offset_days=price_offset,
-    )
-
-    try:
-        result = backtester.run()
-
-        # Print caveat prominently
-        typer.echo("=" * 70)
-        typer.echo(result.caveat)
-        typer.echo("=" * 70)
-        typer.echo()
-
-        if not result.trades:
-            typer.echo("No backtest trades generated.")
-            typer.echo(
-                f"Markets scanned: {result.markets_scanned} | "
-                f"Skipped: {result.markets_skipped}"
-            )
-            return
-
-        # Print trades table
-        typer.echo(
-            f"{'Location':<20} {'Metric':<16} {'Side':<5} "
-            f"{'Price':>6} {'NOAA':>6} {'Edge':>7} "
-            f"{'Actual':>7} {'Result':<6} {'P&L':>9}"
-        )
-        typer.echo("-" * 88)
-
-        for trade in result.trades:
-            typer.echo(
-                f"{trade.location[:19]:<20} {trade.metric[:15]:<16} {trade.side:<5} "
-                f"{trade.historical_price:>6.2f} {trade.noaa_probability:>6.2f} "
-                f"{trade.edge:>+7.2f} {trade.actual_value:>7.1f} "
-                f"{trade.outcome:<6} ${trade.actual_pnl:>+8.2f}"
-            )
-
-        typer.echo("-" * 88)
-        typer.echo()
-
-        # Summary
-        typer.echo("=== Backtest Summary ===")
-        typer.echo(f"Markets scanned:  {result.markets_scanned}")
-        typer.echo(f"Markets skipped:  {result.markets_skipped}")
-        typer.echo(f"Trades generated: {len(result.trades)}")
-        typer.echo(f"Wins: {result.wins} | Losses: {result.losses}")
-        if result.trades:
-            win_rate = result.wins / len(result.trades)
-            typer.echo(f"Win rate: {win_rate:.0%}")
-        typer.echo(f"Total P&L: ${result.total_pnl:+.2f}")
-    finally:
-        backtester.close()
 
 
 @app.command()

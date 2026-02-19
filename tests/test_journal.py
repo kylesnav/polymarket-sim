@@ -306,7 +306,7 @@ class TestGetTradeDetail:
         assert detail is not None
         assert detail["question"] == "Will Seattle high temp be above 60F?"
         assert detail["location"] == "Seattle, WA"
-        assert detail["potential_payout"] == Decimal("25.00") * (Decimal("1") - Decimal("0.40"))
+        assert detail["potential_payout"] == Decimal("25") * (Decimal("1") - Decimal("0.40")) / Decimal("0.40")
 
     def test_returns_none_for_missing(self) -> None:
         """Missing trade returns None."""
@@ -448,7 +448,7 @@ class TestPotentialPayoutNOTrade:
     """Tests for potential_payout calculation on NO-side trades."""
 
     def test_yes_trade_payout(self) -> None:
-        """YES trade at 0.40: potential payout = (1 - 0.40) * 25 = $15."""
+        """YES trade at 0.40, $25 invested: contracts=25/0.40=62.5, payout=62.5-25=$37.50."""
         j = _make_journal()
         trade = _make_trade(side="YES", price="0.40", size="25.00")
         j.log_trade(trade)
@@ -456,10 +456,12 @@ class TestPotentialPayoutNOTrade:
         j.close()
 
         assert detail is not None
-        assert detail["potential_payout"] == Decimal("15.00")
+        # size * (1-cost)/cost = 25 * 0.60/0.40 = 37.50
+        expected = Decimal("25") * (Decimal("1") - Decimal("0.40")) / Decimal("0.40")
+        assert detail["potential_payout"] == expected
 
     def test_no_trade_payout(self) -> None:
-        """NO trade at 0.40 (YES price): effective entry = 0.60, payout = (1 - 0.60) * 25 = $10."""
+        """NO trade at YES price 0.40, $25: cost=0.60, contracts=25/0.60=41.67, profit=16.67."""
         j = _make_journal()
         trade = _make_trade(side="NO", price="0.40", size="25.00")
         j.log_trade(trade)
@@ -467,11 +469,12 @@ class TestPotentialPayoutNOTrade:
         j.close()
 
         assert detail is not None
-        # NO entry price = 1 - 0.40 = 0.60; payout = (1 - 0.60) * 25 = 10
-        assert detail["potential_payout"] == Decimal("10.00")
+        # NO cost = 1-0.40 = 0.60. size * (1-cost)/cost = 25 * 0.40/0.60
+        expected = Decimal("25") * Decimal("0.40") / Decimal("0.60")
+        assert detail["potential_payout"] == expected
 
     def test_no_trade_high_yes_price(self) -> None:
-        """NO at 0.90 YES price: entry=0.10, payout=(1-0.10)*25=$22.50."""
+        """NO at 0.90 YES price: cost=0.10, contracts=25/0.10=250, profit=250-25=$225."""
         j = _make_journal()
         trade = _make_trade(trade_id="t002", side="NO", price="0.90", size="25.00")
         j.log_trade(trade)
@@ -479,7 +482,9 @@ class TestPotentialPayoutNOTrade:
         j.close()
 
         assert detail is not None
-        assert detail["potential_payout"] == Decimal("22.50")
+        # NO cost = 1-0.90 = 0.10. size * (1-cost)/cost = 25 * 0.90/0.10 = 225
+        expected = Decimal("25") * Decimal("0.90") / Decimal("0.10")
+        assert detail["potential_payout"] == expected
 
 
 class TestLifecycleCountsEmptyEventDate:

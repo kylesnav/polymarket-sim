@@ -185,15 +185,16 @@ class TestExecuteSignals:
         assert len(trades) == 0
         sim._journal.log_trade.assert_not_called()
 
-    def test_position_limit_blocks_oversized_trade(self, sim: Simulator) -> None:
+    def test_position_limit_caps_oversized_trade(self, sim: Simulator) -> None:
         sim._last_markets = [_make_market()]
         sim._journal.has_open_trade.return_value = False
 
-        # 5% of 500 = 25, so $30 exceeds the cap
+        # 5% of 500 = 25, so $30 exceeds the cap — should be capped to $25
         signal = _make_signal(size=Decimal("30.00"))
         trades = sim.execute_signals([signal])
 
-        assert len(trades) == 0
+        assert len(trades) == 1
+        assert trades[0].size == Decimal("25.00")
 
     def test_skips_when_logging_fails(self, sim: Simulator) -> None:
         sim._last_markets = [_make_market()]

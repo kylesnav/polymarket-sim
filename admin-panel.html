@@ -374,9 +374,6 @@ tbody tr:last-child td { border-bottom: none; }
 .glossary-table td { padding: 10px 14px; vertical-align: top; }
 .glossary-table td:first-child { color: var(--blue); font-weight: 600; width: 180px; white-space: nowrap; }
 .glossary-table td:last-child { color: var(--text-2); line-height: 1.6; }
-.backtest-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
-.backtest-summary .report-stat { margin-bottom: 0; }
-
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -426,7 +423,6 @@ tbody tr:last-child td { border-bottom: none; }
     <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
     <button class="tab-btn" data-tab="scan">Scan Markets</button>
     <button class="tab-btn" data-tab="simulate">Find &amp; Place Bets</button>
-    <button class="tab-btn" data-tab="backtest">Backtest</button>
     <button class="tab-btn" data-tab="history">My Bets</button>
     <button class="tab-btn" data-tab="logs">Activity Log</button>
     <button class="tab-btn" data-tab="settings">Settings</button>
@@ -640,59 +636,6 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: BACKTEST                                       -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-backtest">
-    <div class="section-header">
-      <div class="section-title">Backtest Historical Performance</div>
-    </div>
-    <p class="tab-description">Test the strategy against weather events that already happened. This may take 30-60 seconds.</p>
-    <div class="form-row" style="margin-bottom:14px">
-      <div class="form-group">
-        <label class="form-label">Days to Look Back <span class="tip" data-tip="How many days of recently closed markets to analyze.">?</span></label>
-        <input class="form-input" type="number" id="btLookback" value="7" min="1" max="30">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Price Sample Offset <span class="tip" data-tip="How many days before the event to sample the market price.">?</span></label>
-        <input class="form-input" type="number" id="btPriceOffset" value="2" min="1" max="7">
-      </div>
-    </div>
-    <div class="form-group" style="max-width:300px;margin-bottom:14px">
-      <label class="form-label">Simulated Bankroll ($)</label>
-      <input class="form-input" type="number" id="btBankroll" value="500" step="50">
-    </div>
-    <div class="action-bar">
-      <button class="action-btn primary" id="backtestBtn">Run Backtest</button>
-    </div>
-    <div class="action-output" id="backtestOutput"></div>
-    <div class="caveat-banner" id="backtestCaveat" style="display:none"></div>
-
-    <div id="backtestResults" style="display:none">
-      <div class="backtest-summary" id="backtestSummary"></div>
-      <div class="table-section">
-        <div class="section-header">
-          <div class="section-title">Backtest Trades</div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>The Bet</th>
-              <th>Position</th>
-              <th>NOAA Says</th>
-              <th>Market Says</th>
-              <th>Our Edge</th>
-              <th>Actual Weather</th>
-              <th>Result</th>
-              <th>Profit/Loss</th>
-            </tr>
-          </thead>
-          <tbody id="backtestBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════ -->
   <!-- TAB: MY BETS                                        -->
   <!-- ═══════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-history">
@@ -844,7 +787,6 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="how-section">
       <h3>Glossary</h3>
       <table class="glossary-table">
-        <tr><td>Backtest</td><td>Replaying the strategy against past weather events to see historical performance.</td></tr>
         <tr><td>Bankroll</td><td>Total money available for bets.</td></tr>
         <tr><td>Edge</td><td>The gap between NOAA's forecast and the market price. A 15% edge means the market is 15 cents off from what the data says.</td></tr>
         <tr><td>Kelly Criterion</td><td>Math formula for optimal bet sizing. We use quarter-Kelly (25%) to be safe.</td></tr>
@@ -1668,6 +1610,12 @@ document.getElementById('placeBetsBtn').addEventListener('click', async function
       const totalWagered = trades.reduce((sum, t) => sum + (t.size || 0), 0);
       let msg = `<span class="success">Placed ${trades.length} bet${trades.length !== 1 ? 's' : ''} totaling $${totalWagered.toFixed(2)}.</span>`;
       if (data.skipped > 0) msg += ` <span style="color:var(--text-3)">(${data.skipped} skipped)</span>`;
+      const reasons = data.skip_reasons || [];
+      if (reasons.length) {
+        msg += '\n<span style="color:var(--text-3);font-size:0.85em">';
+        reasons.forEach(r => { msg += `\n&bull; ${r.reason}`; });
+        msg += '</span>';
+      }
       showOutput('simOutput', msg);
       document.getElementById('betSlip').style.display = 'none';
       document.getElementById('simSignalsSection').style.display = 'none';
@@ -1706,72 +1654,6 @@ document.getElementById('resolveBtn').addEventListener('click', async function()
     }
   } catch (e) {
     showOutput('simOutput', `<span class="error">Resolution failed: ${e.message}</span>`);
-  }
-  setLoading(this, false);
-});
-
-// ═══════════════════════════════════════
-//  ACTIONS: BACKTEST
-// ═══════════════════════════════════════
-
-document.getElementById('backtestBtn').addEventListener('click', async function() {
-  setLoading(this, true);
-  hideOutput('backtestOutput');
-  document.getElementById('backtestCaveat').style.display = 'none';
-  document.getElementById('backtestResults').style.display = 'none';
-  try {
-    const body = {
-      lookback_days: parseInt(document.getElementById('btLookback').value) || 7,
-      price_offset_days: parseInt(document.getElementById('btPriceOffset').value) || 2,
-      bankroll: parseFloat(document.getElementById('btBankroll').value) || 500,
-    };
-    const data = await api('POST', '/api/backtest', body);
-    if (data.error) {
-      showOutput('backtestOutput', `<span class="error">Backtest failed: ${data.error}</span>`);
-    } else {
-      const trades = data.trades || [];
-      if (!trades.length) {
-        showOutput('backtestOutput', `<span class="info">No backtest trades generated.</span> Markets scanned: ${data.markets_scanned}, Skipped: ${data.markets_skipped}`);
-      } else {
-        showOutput('backtestOutput', `<span class="success">Backtest complete.</span> ${trades.length} trades analyzed.`);
-
-        if (data.caveat) {
-          document.getElementById('backtestCaveat').textContent = data.caveat;
-          document.getElementById('backtestCaveat').style.display = 'block';
-        }
-
-        const summary = document.getElementById('backtestSummary');
-        summary.innerHTML = `
-          <div class="report-stat"><div class="report-stat-label">Markets Scanned</div><div class="report-stat-value">${data.markets_scanned}</div></div>
-          <div class="report-stat"><div class="report-stat-label">Trades Generated</div><div class="report-stat-value">${trades.length}</div></div>
-          <div class="report-stat"><div class="report-stat-label">Win Rate</div><div class="report-stat-value ${data.win_rate >= 0.5 ? 'val-pos' : ''}">${(data.win_rate * 100).toFixed(0)}% (${data.wins}W/${data.losses}L)</div></div>
-          <div class="report-stat"><div class="report-stat-label">Total P&L</div><div class="report-stat-value ${data.total_pnl >= 0 ? 'val-pos' : 'val-neg'}">${data.total_pnl >= 0 ? '+' : ''}$${data.total_pnl.toFixed(2)}</div></div>
-        `;
-
-        const tbody = document.getElementById('backtestBody');
-        tbody.innerHTML = trades.map(t => {
-          const desc = t.question || `${t.location || ''} ${formatMetric(t.metric || '')} ${t.comparison || ''} ${t.threshold || ''}`;
-          const sideClass = t.side === 'YES' ? 'badge-yes' : 'badge-no';
-          const outcomeClass = t.outcome === 'won' ? 'badge-won' : 'badge-lost';
-          const edgePct = (Math.abs(t.edge) * 100).toFixed(0);
-          const edgeClass = Math.abs(t.edge) >= 0.15 ? 'edge-strong' : 'edge-marginal';
-          return `<tr style="cursor:default">
-            <td style="color:var(--text-1);max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${desc}">${desc}</td>
-            <td><span class="badge ${sideClass}">${t.side === 'YES' ? 'Yes' : 'No'}</span></td>
-            <td style="color:var(--green)">${((t.noaa_probability || 0) * 100).toFixed(0)}%</td>
-            <td>${((t.historical_price || 0) * 100).toFixed(0)}%</td>
-            <td class="${edgeClass}">${edgePct}%</td>
-            <td>${(t.actual_value || 0).toFixed(1)}</td>
-            <td><span class="badge ${outcomeClass}">${t.outcome}</span></td>
-            <td><span class="${t.actual_pnl >= 0 ? 'val-pos' : 'val-neg'}">${t.actual_pnl >= 0 ? '+' : ''}$${t.actual_pnl.toFixed(2)}</span></td>
-          </tr>`;
-        }).join('');
-
-        document.getElementById('backtestResults').style.display = 'block';
-      }
-    }
-  } catch (e) {
-    showOutput('backtestOutput', `<span class="error">Backtest failed: ${e.message}</span>`);
   }
   setLoading(this, false);
 });

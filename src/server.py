@@ -20,7 +20,6 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from src.backtest import Backtester
 from src.config import Settings
 from src.journal import Journal
 from src.noaa import NOAAClient
@@ -143,10 +142,15 @@ def _enrich_signals(
             d["event_date"] = market.event_date.isoformat()
             d["metric"] = market.metric
             d["threshold"] = market.threshold
-            # Compute potential payout for display
+            # Compute potential payout (size is dollars invested, not contracts)
             price = float(d.get("market_price", 0))
             size = float(d.get("recommended_size", 0))
-            d["potential_payout"] = round((1.0 - price) * size, 2)
+            side = d.get("side", "YES")
+            effective_price = price if side == "YES" else 1.0 - price
+            if effective_price > 0:
+                d["potential_payout"] = round(size * (1.0 - effective_price) / effective_price, 2)
+            else:
+                d["potential_payout"] = 0.0
         enriched.append(d)
     return enriched
 
@@ -325,6 +329,7 @@ async def run_sim_execute(request: Request) -> JSONResponse:
             "trades": [t.model_dump() for t in trades],
             "signals": _enrich_signals(selected, sim),
             "skipped": len(market_ids) - len(trades),
+            "skip_reasons": sim.last_skip_reasons,
             "message": f"Placed {len(trades)} bet(s).",
         })
     except Exception as e:
@@ -348,50 +353,6 @@ def run_resolve() -> JSONResponse:
     finally:
         noaa.close()
         journal.close()
-
-
-@app.post("/api/backtest")
-async def run_backtest(request: Request) -> JSONResponse:
-    """Run backtest against recently resolved weather markets.
-
-    Accepts optional JSON body with lookback_days, price_offset_days, bankroll.
-    """
-    body: dict[str, Any] = {}
-    if request.headers.get("content-type", "").startswith("application/json"):
-        body = await request.json()
-
-    settings = _load_settings()
-    lookback = int(body.get("lookback_days", 7))
-    price_offset = int(body.get("price_offset_days", 2))
-    bankroll = float(body.get("bankroll", settings.max_bankroll))
-
-    backtester = Backtester(
-        bankroll=Decimal(str(bankroll)),
-        min_edge=Decimal(str(settings.min_edge_threshold)),
-        kelly_fraction=Decimal(str(settings.kelly_fraction)),
-        position_cap_pct=Decimal(str(settings.position_cap_pct)),
-        lookback_days=lookback,
-        price_offset_days=price_offset,
-    )
-
-    try:
-        result = backtester.run()
-        trade_count = len(result.trades)
-        return _json({
-            "trades": [t.model_dump() for t in result.trades],
-            "wins": result.wins,
-            "losses": result.losses,
-            "total_pnl": result.total_pnl,
-            "markets_scanned": result.markets_scanned,
-            "markets_skipped": result.markets_skipped,
-            "caveat": result.caveat,
-            "win_rate": result.wins / trade_count if trade_count else 0,
-        })
-    except Exception as e:
-        logger.error("backtest_failed", error=str(e))
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    finally:
-        backtester.close()
 
 
 # ── Data Queries ────────────────────────────────────

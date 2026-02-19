@@ -223,13 +223,16 @@ def _calculate_outcome(
     won = condition_met if trade.side == "YES" else not condition_met
 
     # Calculate P&L
-    # trade.price is always the YES price. For NO trades, actual cost = 1 - yes_price.
+    # trade.size is dollars invested. trade.price is the YES price.
+    # For NO trades, cost per contract = 1 - yes_price.
+    # Contracts bought = size / cost_per_contract.
+    # Win payout = contracts * $1. P&L = payout - size.
     cost = trade.price if trade.side == "YES" else Decimal("1") - trade.price
     if won:
         outcome = "won"
-        actual_pnl = (Decimal("1") - cost) * trade.size
+        actual_pnl = trade.size * (Decimal("1") - cost) / cost
     else:
         outcome = "lost"
-        actual_pnl = -cost * trade.size
+        actual_pnl = -trade.size
 
     return _OutcomeResult(outcome, actual_pnl, actual_value, unit)
