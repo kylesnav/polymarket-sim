@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import structlog
 import typer
@@ -13,6 +14,9 @@ from src.journal import Journal
 from src.noaa import NOAAClient
 from src.resolver import resolve_trades
 from src.simulator import Simulator
+
+if TYPE_CHECKING:
+    from src.models import Signal
 
 logger = structlog.get_logger()
 
@@ -90,13 +94,20 @@ def scan() -> None:
 @app.command()
 def sim(
     bankroll: float = typer.Option(500.0, help="Starting bankroll in dollars"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show hypothetical P&L without writing trades"
+    ),
 ) -> None:
     """Run simulation: scan markets, generate signals, execute paper trades."""
     settings = Settings()
     _configure_logging(settings.log_level)
 
     effective_bankroll = Decimal(str(bankroll))
-    logger.info("starting_simulation", bankroll=str(effective_bankroll))
+    logger.info(
+        "starting_simulation",
+        bankroll=str(effective_bankroll),
+        dry_run=dry_run,
+    )
 
     simulator = Simulator(
         bankroll=effective_bankroll,
@@ -118,6 +129,10 @@ def sim(
 
         typer.echo(f"Found {len(signals)} signal(s) above threshold.")
 
+        if dry_run:
+            _print_dry_run(signals)
+            return
+
         # Execute paper trades
         trades = simulator.execute_signals(signals)
 
@@ -134,6 +149,50 @@ def sim(
         typer.echo(f"Bankroll: ${portfolio.total_value:.2f}")
     finally:
         simulator.close()
+
+
+def _print_dry_run(signals: list[Signal]) -> None:
+    """Print hypothetical P&L summary for signals without writing to journal.
+
+    Uses expected value (edge * size) as the projected P&L per signal.
+
+    Args:
+        signals: Trading signals from the scan.
+    """
+
+    typer.echo("\n=== Dry Run: Hypothetical P&L ===")
+    typer.echo(
+        f"{'Market':<40} {'Side':<5} {'NOAA':>6} {'Mkt':>6} "
+        f"{'Edge':>7} {'Size ($)':>9} {'Proj P&L':>10}"
+    )
+    typer.echo("-" * 88)
+
+    total_pnl = Decimal("0")
+    total_size = Decimal("0")
+
+    for signal in signals:
+        proj_pnl = signal.edge * signal.recommended_size
+        total_pnl += proj_pnl
+        total_size += signal.recommended_size
+
+        typer.echo(
+            f"{signal.market_id[:39]:<40} {signal.side:<5} "
+            f"{signal.noaa_probability:>6.2f} {signal.market_price:>6.2f} "
+            f"{signal.edge:>+7.2f} ${signal.recommended_size:>8.2f} "
+            f"${proj_pnl:>+9.2f}"
+        )
+
+    typer.echo("-" * 88)
+    typer.echo(
+        f"{'TOTAL':<40} {'':<5} {'':<6} {'':<6} "
+        f"{'':>7} ${total_size:>8.2f} ${total_pnl:>+9.2f}"
+    )
+    typer.echo(
+        f"\n{len(signals)} signal(s) | "
+        f"Total exposure: ${total_size:.2f} | "
+        f"Projected P&L: ${total_pnl:+.2f}"
+    )
+    typer.echo("(No trades written to journal)")
 
 
 @app.command()

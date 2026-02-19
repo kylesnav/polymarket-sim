@@ -46,34 +46,70 @@ class TestPositionLimit:
 class TestBankrollLimit:
     """Tests for check_bankroll_limit."""
 
-    def test_allows_within_bankroll(self) -> None:
-        """Trade within bankroll is allowed."""
+    def test_allows_trade_with_sufficient_cash(self) -> None:
+        """Trade is allowed when cash covers the trade and value is at ceiling."""
         allowed, reason = check_bankroll_limit(
-            current_value=Decimal("400"),
-            pending=Decimal("50"),
+            cash=Decimal("500"),
+            pending=Decimal("25"),
+            total_value=Decimal("500"),
             max_bankroll=Decimal("500"),
         )
         assert allowed is True
         assert reason == "OK"
 
-    def test_rejects_over_bankroll(self) -> None:
-        """Trade that exceeds max bankroll is rejected."""
+    def test_allows_trade_below_ceiling(self) -> None:
+        """Trade is allowed when portfolio value is below ceiling."""
         allowed, reason = check_bankroll_limit(
-            current_value=Decimal("480"),
-            pending=Decimal("30"),
-            max_bankroll=Decimal("500"),
-        )
-        assert allowed is False
-        assert "exceeds max bankroll" in reason
-
-    def test_allows_at_exact_bankroll(self) -> None:
-        """Trade at exactly max bankroll is allowed."""
-        allowed, _ = check_bankroll_limit(
-            current_value=Decimal("450"),
+            cash=Decimal("400"),
             pending=Decimal("50"),
+            total_value=Decimal("400"),
             max_bankroll=Decimal("500"),
         )
         assert allowed is True
+        assert reason == "OK"
+
+    def test_rejects_insufficient_cash(self) -> None:
+        """Trade is rejected when cash cannot cover it."""
+        allowed, reason = check_bankroll_limit(
+            cash=Decimal("20"),
+            pending=Decimal("25"),
+            total_value=Decimal("400"),
+            max_bankroll=Decimal("500"),
+        )
+        assert allowed is False
+        assert "Insufficient cash" in reason
+
+    def test_rejects_when_value_above_ceiling(self) -> None:
+        """Trade is rejected when portfolio has grown past max bankroll."""
+        allowed, reason = check_bankroll_limit(
+            cash=Decimal("510"),
+            pending=Decimal("25"),
+            total_value=Decimal("510"),
+            max_bankroll=Decimal("500"),
+        )
+        assert allowed is False
+        assert "exceeds" in reason
+
+    def test_allows_at_exact_ceiling(self) -> None:
+        """Trade at exactly max bankroll value is allowed."""
+        allowed, _ = check_bankroll_limit(
+            cash=Decimal("500"),
+            pending=Decimal("50"),
+            total_value=Decimal("500"),
+            max_bankroll=Decimal("500"),
+        )
+        assert allowed is True
+
+    def test_initial_deployment_not_blocked(self) -> None:
+        """Starting bankroll == max_bankroll does not block initial trades."""
+        allowed, reason = check_bankroll_limit(
+            cash=Decimal("500"),
+            pending=Decimal("25"),
+            total_value=Decimal("500"),
+            max_bankroll=Decimal("500"),
+        )
+        assert allowed is True
+        assert reason == "OK"
 
 
 class TestDailyLoss:

@@ -169,9 +169,10 @@ class Simulator:
                 continue
 
             allowed, reason = check_bankroll_limit(
-                self._portfolio.total_value,
-                signal.recommended_size,
-                self._max_bankroll,
+                cash=self._portfolio.cash,
+                pending=signal.recommended_size,
+                total_value=self._portfolio.total_value,
+                max_bankroll=self._max_bankroll,
             )
             if not allowed:
                 logger.warning(
