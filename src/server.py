@@ -1,23 +1,57 @@
-"""FastAPI admin panel server for the Polymarket weather bot."""
+"""FastAPI server for the Weather Edge Tracker."""
 
 from __future__ import annotations
 
+import collections
 import json
 import logging
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
+from src.backtest import Backtester
 from src.config import Settings
 from src.journal import Journal
 from src.noaa import NOAAClient
 from src.resolver import resolve_trades
 from src.simulator import Simulator
+
+# ── Log buffer for /api/logs endpoint ────────────────
+
+_log_buffer: collections.deque[dict[str, Any]] = collections.deque(maxlen=500)
+_log_lock = Lock()
+_log_counter = 0
+
+
+def _buffer_log_processor(
+    _logger: Any,  # noqa: ANN401
+    method_name: str,
+    event_dict: dict[str, Any],
+) -> dict[str, Any]:
+    """Structlog processor that copies log entries to the ring buffer."""
+    global _log_counter  # noqa: PLW0603
+    entry = {
+        "timestamp": event_dict.get("timestamp", ""),
+        "level": event_dict.get("level", method_name),
+        "event": event_dict.get("event", ""),
+    }
+    # Include extra fields (skip internal keys)
+    skip = {"timestamp", "level", "event", "_record", "_from_structlog"}
+    for k, v in event_dict.items():
+        if k not in skip:
+            entry[k] = str(v)
+    with _log_lock:
+        _log_counter += 1
+        entry["id"] = _log_counter
+        _log_buffer.append(entry)
+    return event_dict
+
 
 # Configure structlog so bot modules can log
 structlog.configure(
@@ -25,13 +59,14 @@ structlog.configure(
     processors=[
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
+        _buffer_log_processor,
         structlog.dev.ConsoleRenderer(),
     ],
 )
 
 logger = structlog.get_logger()
 
-app = FastAPI(title="Polymarket Weather Bot Admin")
+app = FastAPI(title="Weather Edge Tracker")
 
 
 class _Encoder(json.JSONEncoder):
@@ -74,6 +109,26 @@ def _make_simulator(settings: Settings) -> Simulator:
         daily_loss_limit_pct=Decimal(str(settings.daily_loss_limit_pct)),
         kill_switch=settings.kill_switch,
     )
+
+
+def _enrich_signals(
+    signals: list[Any],  # noqa: ANN401
+    sim: Simulator,
+) -> list[dict[str, Any]]:
+    """Add market question/location/event info to signal dicts."""
+    market_lookup = {m.market_id: m for m in sim.last_markets}
+    enriched: list[dict[str, Any]] = []
+    for s in signals:
+        d: dict[str, Any] = s.model_dump()
+        market = market_lookup.get(s.market_id)
+        if market:
+            d["question"] = market.question
+            d["location"] = market.location
+            d["event_date"] = market.event_date.isoformat()
+            d["metric"] = market.metric
+            d["threshold"] = market.threshold
+        enriched.append(d)
+    return enriched
 
 
 # ── Static ──────────────────────────────────────────
@@ -150,7 +205,6 @@ async def toggle_kill_switch(request: Request) -> JSONResponse:
     """Toggle kill switch on/off."""
     body = await request.json()
     enabled = body.get("enabled", False)
-    # Reuse update_settings logic
     env_path = Path(".env")
     lines: list[str] = []
     if env_path.exists():
@@ -180,7 +234,7 @@ def run_scan() -> JSONResponse:
     try:
         signals = sim.run_scan()
         return _json({
-            "signals": [s.model_dump() for s in signals],
+            "signals": _enrich_signals(signals, sim),
             "count": len(signals),
         })
     except Exception as e:
@@ -208,7 +262,7 @@ def run_sim() -> JSONResponse:
         trades = sim.execute_signals(signals)
         portfolio = sim.get_portfolio()
         return _json({
-            "signals": [s.model_dump() for s in signals],
+            "signals": _enrich_signals(signals, sim),
             "trades": [t.model_dump() for t in trades],
             "portfolio": portfolio.model_dump(),
         })
@@ -233,6 +287,50 @@ def run_resolve() -> JSONResponse:
     finally:
         noaa.close()
         journal.close()
+
+
+@app.post("/api/backtest")
+async def run_backtest(request: Request) -> JSONResponse:
+    """Run backtest against recently resolved weather markets.
+
+    Accepts optional JSON body with lookback_days, price_offset_days, bankroll.
+    """
+    body: dict[str, Any] = {}
+    if request.headers.get("content-type", "").startswith("application/json"):
+        body = await request.json()
+
+    settings = _load_settings()
+    lookback = int(body.get("lookback_days", 7))
+    price_offset = int(body.get("price_offset_days", 2))
+    bankroll = float(body.get("bankroll", settings.max_bankroll))
+
+    backtester = Backtester(
+        bankroll=Decimal(str(bankroll)),
+        min_edge=Decimal(str(settings.min_edge_threshold)),
+        kelly_fraction=Decimal(str(settings.kelly_fraction)),
+        position_cap_pct=Decimal(str(settings.position_cap_pct)),
+        lookback_days=lookback,
+        price_offset_days=price_offset,
+    )
+
+    try:
+        result = backtester.run()
+        trade_count = len(result.trades)
+        return _json({
+            "trades": [t.model_dump() for t in result.trades],
+            "wins": result.wins,
+            "losses": result.losses,
+            "total_pnl": result.total_pnl,
+            "markets_scanned": result.markets_scanned,
+            "markets_skipped": result.markets_skipped,
+            "caveat": result.caveat,
+            "win_rate": result.wins / trade_count if trade_count else 0,
+        })
+    except Exception as e:
+        logger.error("backtest_failed", error=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        backtester.close()
 
 
 # ── Data Queries ────────────────────────────────────
@@ -279,3 +377,18 @@ def get_snapshots(days: int = 60) -> JSONResponse:
         return _json({"snapshots": snapshots})
     finally:
         journal.close()
+
+
+@app.get("/api/logs")
+def get_logs(since: int = 0) -> JSONResponse:
+    """Get recent log entries for the activity log viewer.
+
+    Args:
+        since: Return only entries with id > this value (cursor-based polling).
+    """
+    with _log_lock:
+        entries = [e for e in _log_buffer if e.get("id", 0) > since]
+    return _json({
+        "logs": entries,
+        "cursor": _log_counter,
+    })

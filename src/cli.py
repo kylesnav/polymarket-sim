@@ -351,5 +351,31 @@ def status() -> None:
     typer.echo(f"Log Level:         {settings.log_level}")
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Host to bind the web server to"),
+    port: int = typer.Option(8000, help="Port to run the web server on"),
+) -> None:
+    """Start the web dashboard server.
+
+    Opens the Weather Edge Tracker UI in your browser.
+    Everything available in the CLI is also available through the web interface.
+    """
+    import uvicorn  # noqa: PLC0415
+
+    settings = Settings()
+    _configure_logging(settings.log_level)
+
+    typer.echo(f"Starting Weather Edge Tracker at http://{host}:{port}")
+    typer.echo("Press Ctrl+C to stop.\n")
+
+    uvicorn.run(
+        "src.server:app",
+        host=host,
+        port=port,
+        log_level=settings.log_level.lower(),
+    )
+
+
 if __name__ == "__main__":
     app()
