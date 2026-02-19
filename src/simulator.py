@@ -21,6 +21,7 @@ from src.limits import (
 from src.models import NOAAForecast, Portfolio, Signal, Trade, WeatherMarket
 from src.noaa import NOAAClient
 from src.polymarket import PolymarketClient
+from src.resolver import resolve_trades
 from src.strategy import scan_weather_markets
 
 logger = structlog.get_logger()
@@ -66,19 +67,63 @@ class Simulator:
         self._noaa = NOAAClient()
         self._journal = Journal()
 
+        # Restore portfolio state from journal (accounts for existing trades)
+        summary = self._journal.get_portfolio_summary(bankroll)
+        restored_cash = Decimal(str(summary["cash"]))
+        restored_total = Decimal(str(summary["total_value"]))
         self._portfolio = Portfolio(
-            cash=bankroll,
-            total_value=bankroll,
+            cash=restored_cash,
+            total_value=restored_total,
             starting_bankroll=bankroll,
         )
+        self._bankroll = restored_cash
 
         self._last_markets: list[WeatherMarket] = []
         self._last_forecasts: dict[str, NOAAForecast] = {}
+        self._last_skip_reasons: list[dict[str, str]] = []
 
-        logger.info("simulator_initialized", bankroll=str(bankroll))
+        logger.info(
+            "simulator_initialized",
+            starting_bankroll=str(bankroll),
+            restored_cash=str(restored_cash),
+            restored_total=str(restored_total),
+        )
+
+    def resolve_pending(self) -> dict[str, object]:
+        """Resolve any trades whose event dates have passed.
+
+        Fetches actual NOAA observations and calculates real P&L,
+        then refreshes portfolio state from the journal.
+
+        Returns:
+            Resolution statistics dict.
+        """
+        stats = resolve_trades(self._journal, self._noaa)
+        resolved_count = stats.get("resolved_count", 0)
+        if resolved_count:
+            logger.info("auto_resolved_trades", count=resolved_count)
+            self._refresh_portfolio()
+        return stats
+
+    def _refresh_portfolio(self) -> None:
+        """Refresh portfolio state from the journal after resolution."""
+        summary = self._journal.get_portfolio_summary(
+            self._portfolio.starting_bankroll
+        )
+        restored_cash = Decimal(str(summary["cash"]))
+        restored_total = Decimal(str(summary["total_value"]))
+        self._portfolio = Portfolio(
+            cash=restored_cash,
+            total_value=restored_total,
+            starting_bankroll=self._portfolio.starting_bankroll,
+        )
+        self._bankroll = restored_cash
 
     def run_scan(self) -> list[Signal]:
         """Fetch markets, get forecasts, and generate trading signals.
+
+        Auto-resolves past trades first, then filters out markets
+        whose event dates have already passed.
 
         Returns:
             List of actionable trading signals.
@@ -89,6 +134,9 @@ class Simulator:
             logger.warning("scan_blocked", reason=reason)
             return []
 
+        # Auto-resolve past trades to free up cash
+        self.resolve_pending()
+
         logger.info("starting_market_scan")
 
         # Fetch weather markets from Polymarket
@@ -97,17 +145,24 @@ class Simulator:
             logger.info("no_weather_markets_found")
             return []
 
-        self._last_markets = markets
-        logger.info("weather_markets_found", count=len(markets))
+        # Filter out markets whose event dates have already passed
+        today = date.today()
+        active_markets = [m for m in markets if m.event_date >= today]
+        filtered_count = len(markets) - len(active_markets)
+        if filtered_count:
+            logger.info("filtered_past_markets", count=filtered_count)
+
+        self._last_markets = active_markets
+        logger.info("weather_markets_found", count=len(active_markets))
 
         # Fetch NOAA forecasts for each market
-        forecasts = self._fetch_forecasts(markets)
+        forecasts = self._fetch_forecasts(active_markets)
         self._last_forecasts = forecasts
         logger.info("forecasts_fetched", count=len(forecasts))
 
         # Generate signals
         signals = scan_weather_markets(
-            markets=markets,
+            markets=active_markets,
             forecasts=forecasts,
             min_edge=self._min_edge,
             kelly_fraction=self._kelly_fraction,
@@ -135,6 +190,7 @@ class Simulator:
             List of executed Trade records.
         """
         trades: list[Trade] = []
+        self._last_skip_reasons = []
 
         # Build market lookup from last scan
         market_lookup: dict[str, WeatherMarket] = {}
@@ -148,12 +204,19 @@ class Simulator:
                     "skipping_duplicate_market",
                     market_id=signal.market_id,
                 )
+                self._last_skip_reasons.append({
+                    "market_id": signal.market_id,
+                    "reason": "Already have an open bet on this market",
+                })
                 continue
 
             # Pre-execution limit checks
             allowed, reason = check_kill_switch(self._kill_switch)
             if not allowed:
                 logger.warning("trade_blocked_kill_switch", market_id=signal.market_id)
+                self._last_skip_reasons.append({
+                    "market_id": signal.market_id, "reason": "Kill switch engaged",
+                })
                 continue
 
             allowed, reason = check_daily_loss(
@@ -163,24 +226,30 @@ class Simulator:
             )
             if not allowed:
                 logger.warning("trade_blocked_daily_loss", market_id=signal.market_id)
+                self._last_skip_reasons.append({
+                    "market_id": signal.market_id, "reason": "Daily loss limit reached",
+                })
                 continue
 
+            trade_size = signal.recommended_size
             allowed, reason = check_position_limit(
-                signal.recommended_size,
+                trade_size,
                 self._max_bankroll,
                 self._position_cap_pct,
             )
             if not allowed:
-                logger.warning(
-                    "trade_blocked_position_limit",
+                # Cap to position limit instead of rejecting
+                trade_size = self._max_bankroll * self._position_cap_pct
+                logger.info(
+                    "trade_size_capped",
                     market_id=signal.market_id,
-                    reason=reason,
+                    original=str(signal.recommended_size),
+                    capped=str(trade_size),
                 )
-                continue
 
             allowed, reason = check_bankroll_limit(
                 cash=self._portfolio.cash,
-                pending=signal.recommended_size,
+                pending=trade_size,
                 total_value=self._portfolio.total_value,
                 max_bankroll=self._max_bankroll,
             )
@@ -190,6 +259,9 @@ class Simulator:
                     market_id=signal.market_id,
                     reason=reason,
                 )
+                self._last_skip_reasons.append({
+                    "market_id": signal.market_id, "reason": reason,
+                })
                 continue
 
             # Create trade record
@@ -197,7 +269,7 @@ class Simulator:
                 market_id=signal.market_id,
                 side=signal.side,
                 price=signal.market_price,
-                size=signal.recommended_size,
+                size=trade_size,
                 noaa_probability=signal.noaa_probability,
                 edge=signal.edge,
                 timestamp=datetime.now(tz=UTC),
@@ -227,6 +299,10 @@ class Simulator:
                     "trade_logging_failed_skipping",
                     trade_id=trade.trade_id,
                 )
+                self._last_skip_reasons.append({
+                    "market_id": signal.market_id,
+                    "reason": "Trade logging failed (safety rail #7)",
+                })
                 continue
 
             # Cache market metadata for resolution
@@ -259,7 +335,7 @@ class Simulator:
             trades.append(filled_trade)
 
             # Update portfolio: subtract cash spent, total_value stays same (cash→exposure)
-            new_cash = self._portfolio.cash - signal.recommended_size
+            new_cash = self._portfolio.cash - trade_size
             self._portfolio = Portfolio(
                 cash=new_cash,
                 total_value=self._portfolio.total_value,
@@ -340,6 +416,15 @@ class Simulator:
             List of WeatherMarket objects from the last scan.
         """
         return self._last_markets
+
+    @property
+    def last_skip_reasons(self) -> list[dict[str, str]]:
+        """Get skip reasons from the most recent execute_signals call.
+
+        Returns:
+            List of dicts with market_id and reason for each skipped signal.
+        """
+        return self._last_skip_reasons
 
     def get_portfolio(self) -> Portfolio:
         """Get the current portfolio state.

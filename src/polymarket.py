@@ -375,11 +375,9 @@ class PolymarketClient:
                 yes_price = Decimal(str(outcome_prices[0]))
                 no_price = Decimal(str(outcome_prices[1]))
             except (InvalidOperation, IndexError):
-                yes_price = Decimal("0.50")
-                no_price = Decimal("0.50")
+                return None
         else:
-            yes_price = Decimal("0.50")
-            no_price = Decimal("0.50")
+            return None
 
         # Parse location, date, metric, threshold from question
         parsed = _parse_weather_question(question)

@@ -116,14 +116,14 @@ def scan_weather_markets(
         if recommended_size <= Decimal("0"):
             continue
 
-        # Check position limit
+        # Check position limit (cap relative to max bankroll, not current cash)
         allowed, reason = check_position_limit(
-            recommended_size, bankroll, position_cap_pct,
+            recommended_size, max_bankroll, position_cap_pct,
         )
         if not allowed:
             logger.info("position_limit_hit", market_id=market.market_id, reason=reason)
             # Cap to position limit
-            recommended_size = bankroll * position_cap_pct
+            recommended_size = max_bankroll * position_cap_pct
 
         # Check bankroll limit: sufficient cash and portfolio not above ceiling
         allowed, reason = check_bankroll_limit(

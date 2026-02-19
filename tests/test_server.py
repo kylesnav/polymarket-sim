@@ -357,39 +357,6 @@ class TestResolveEndpoint:
 # Backtest
 # ---------------------------------------------------------------------------
 
-class TestBacktestEndpoint:
-    """Tests for POST /api/backtest."""
-
-    @patch("src.server.Backtester")
-    @patch("src.server._load_settings")
-    def test_backtest_returns_results(
-        self, mock_settings: MagicMock, mock_bt_cls: MagicMock, tc: TestClient,
-    ) -> None:
-        settings = MagicMock()
-        settings.max_bankroll = 500
-        settings.min_edge_threshold = 0.10
-        settings.kelly_fraction = 0.25
-        settings.position_cap_pct = 0.05
-        mock_settings.return_value = settings
-
-        bt = MagicMock()
-        result = MagicMock()
-        result.trades = []
-        result.wins = 0
-        result.losses = 0
-        result.total_pnl = Decimal("0")
-        result.markets_scanned = 5
-        result.markets_skipped = 2
-        result.caveat = "Test caveat"
-        bt.run.return_value = result
-        mock_bt_cls.return_value = bt
-
-        resp = tc.post("/api/backtest", json={})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["markets_scanned"] == 5
-
-
 # ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------

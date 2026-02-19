@@ -487,13 +487,13 @@ class Journal:
                    SUM(CASE
                        WHEN status = 'filled'
                            AND event_date_ctx != ''
-                           AND event_date_ctx > ?
+                           AND event_date_ctx >= ?
                        THEN 1 ELSE 0
                    END) AS open_bets,
                    SUM(CASE
                        WHEN status = 'filled'
                            AND event_date_ctx != ''
-                           AND event_date_ctx <= ?
+                           AND event_date_ctx < ?
                        THEN 1 ELSE 0
                    END) AS ready,
                    SUM(CASE
@@ -582,7 +582,7 @@ class Journal:
             lifecycle = "resolved"
         elif status in ("filled", "pending") and event_date_str:
             event_dt = date.fromisoformat(event_date_str)
-            lifecycle = "open" if event_dt > today else "ready"
+            lifecycle = "open" if event_dt >= today else "ready"
         else:
             lifecycle = "open"  # Unknown event date treated as open
 
@@ -595,12 +595,12 @@ class Journal:
             except ValueError:
                 pass
 
-        # Compute potential payout
+        # Compute potential payout (size is dollars invested, not contracts)
         side = str(row["side"])
         price = Decimal(str(row["price"]))
         size = Decimal(str(row["size"]))
         effective_price = price if side == "YES" else (Decimal("1") - price)
-        potential_payout = (Decimal("1") - effective_price) * size
+        potential_payout = size * (Decimal("1") - effective_price) / effective_price
 
         return {
             "trade_id": str(row["trade_id"]),

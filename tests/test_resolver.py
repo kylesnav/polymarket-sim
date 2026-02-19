@@ -66,7 +66,9 @@ class TestCalculateOutcome:
         )
 
         assert result.outcome == "won"
-        assert result.actual_pnl == Decimal("10.00")  # (1.00 - 0.60) * 25
+        # size=$25 invested at cost=$0.60. Contracts=25/0.60=41.67. Payout=41.67. P&L=41.67-25=16.67
+        expected = Decimal("25") * (Decimal("1") - Decimal("0.60")) / Decimal("0.60")
+        assert result.actual_pnl == expected
         assert result.actual_value == 80.0
         assert result.actual_value_unit == "\u00b0F"
 
@@ -84,7 +86,7 @@ class TestCalculateOutcome:
         )
 
         assert result.outcome == "lost"
-        assert result.actual_pnl == Decimal("-15.00")  # (0.00 - 0.60) * 25
+        assert result.actual_pnl == Decimal("-25.00")  # lose entire investment
         assert result.actual_value == 70.0
 
     def test_no_trade_wins_when_condition_not_met(self) -> None:
@@ -101,7 +103,9 @@ class TestCalculateOutcome:
         )
 
         assert result.outcome == "won"
-        assert result.actual_pnl == Decimal("10.00")  # NO cost = 1 - 0.40 = 0.60; (1 - 0.60) * 25
+        # NO cost = 1 - 0.40 = 0.60. size=$25/0.60=41.67 contracts. P&L=41.67-25=16.67
+        expected = Decimal("25") * (Decimal("1") - Decimal("0.60")) / Decimal("0.60")
+        assert result.actual_pnl == expected
 
     def test_no_trade_loses_when_condition_met(self) -> None:
         """NO trade on 'above' loses when actual temp exceeds threshold."""
@@ -117,7 +121,7 @@ class TestCalculateOutcome:
         )
 
         assert result.outcome == "lost"
-        assert result.actual_pnl == Decimal("-15.00")  # NO cost = 1 - 0.40 = 0.60; -0.60 * 25
+        assert result.actual_pnl == Decimal("-25.00")  # lose entire investment
 
     def test_below_comparison(self) -> None:
         """Correctly handles 'below' comparison."""
@@ -133,7 +137,9 @@ class TestCalculateOutcome:
         )
 
         assert result.outcome == "won"
-        assert result.actual_pnl == Decimal("10.00")  # (1.00 - 0.50) * 20
+        # size=$20 at cost=$0.50. Contracts=40. Payout=40. P&L=40-20=20
+        expected = Decimal("20") * (Decimal("1") - Decimal("0.50")) / Decimal("0.50")
+        assert result.actual_pnl == expected
         assert result.actual_value == 30.0
         assert result.actual_value_unit == "\u00b0F"
 
