@@ -40,27 +40,43 @@ def check_position_limit(
 
 
 def check_bankroll_limit(
-    current_value: Decimal,
+    cash: Decimal,
     pending: Decimal,
+    total_value: Decimal,
     max_bankroll: Decimal,
 ) -> tuple[bool, str]:
-    """Check that total portfolio value plus pending trades does not exceed max bankroll.
+    """Check that there is sufficient cash and portfolio hasn't grown past ceiling.
+
+    Buying a position converts cash to exposure — it doesn't increase total
+    value.  The max_bankroll ceiling only prevents reinvesting gains that
+    have pushed total_value above the cap.
 
     Args:
-        current_value: Current portfolio value in dollars.
+        cash: Available cash in dollars.
         pending: Pending trade size in dollars.
+        total_value: Current total portfolio value in dollars.
         max_bankroll: Maximum allowed bankroll.
 
     Returns:
         Tuple of (allowed, reason).
     """
-    total = current_value + pending
-    if total > max_bankroll:
+    if pending > cash:
         reason = (
-            f"Total value ${total} (current ${current_value} + "
-            f"pending ${pending}) exceeds max bankroll ${max_bankroll}"
+            f"Insufficient cash: ${cash} available, "
+            f"${pending} required"
         )
-        logger.warning("bankroll_limit_exceeded", total=total, max_bankroll=max_bankroll)
+        logger.warning("insufficient_cash", cash=cash, pending=pending)
+        return False, reason
+    if total_value > max_bankroll:
+        reason = (
+            f"Portfolio value ${total_value} exceeds "
+            f"max bankroll ${max_bankroll} — halt reinvestment of gains"
+        )
+        logger.warning(
+            "bankroll_ceiling_exceeded",
+            total_value=total_value,
+            max_bankroll=max_bankroll,
+        )
         return False, reason
     return True, "OK"
 

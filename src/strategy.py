@@ -125,10 +125,12 @@ def scan_weather_markets(
             # Cap to position limit
             recommended_size = bankroll * position_cap_pct
 
-        # Check bankroll limit: existing position exposure + new trade <= max bankroll
-        existing_exposure = sum((p.size for p in portfolio.positions), Decimal("0"))
+        # Check bankroll limit: sufficient cash and portfolio not above ceiling
         allowed, reason = check_bankroll_limit(
-            existing_exposure, recommended_size, max_bankroll,
+            cash=portfolio.cash,
+            pending=recommended_size,
+            total_value=portfolio.total_value,
+            max_bankroll=max_bankroll,
         )
         if not allowed:
             logger.info("bankroll_limit_hit", market_id=market.market_id, reason=reason)
