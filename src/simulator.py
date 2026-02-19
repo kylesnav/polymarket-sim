@@ -314,6 +314,15 @@ class Simulator:
 
         return forecasts
 
+    @property
+    def last_markets(self) -> list[WeatherMarket]:
+        """Get markets from the most recent scan.
+
+        Returns:
+            List of WeatherMarket objects from the last scan.
+        """
+        return self._last_markets
+
     def get_portfolio(self) -> Portfolio:
         """Get the current portfolio state.
 
