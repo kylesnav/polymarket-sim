@@ -232,6 +232,23 @@ class Journal:
         )
         return cursor.fetchone() is not None
 
+    def get_open_position_size(self, market_id: str) -> Decimal:
+        """Get total size of open (pending or filled) trades for a market.
+
+        Args:
+            market_id: Market ID to check.
+
+        Returns:
+            Total position size in dollars, or zero if no open trades.
+        """
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT COALESCE(SUM(CAST(size AS REAL)), 0) FROM trades "
+            "WHERE market_id = ? AND status IN ('pending', 'filled')",
+            (market_id,),
+        )
+        return Decimal(str(cursor.fetchone()[0]))
+
     def update_trade_status(self, trade_id: str, status: str) -> bool:
         """Update the status of a trade.
 

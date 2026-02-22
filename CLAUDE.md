@@ -49,13 +49,22 @@ polymarket-weather-bot/
 │   ├── strategy.py        # NOAA vs market price comparison
 │   ├── sizing.py          # Quarter-Kelly position sizing
 │   ├── limits.py          # Bankroll/position hard limits
-│   ├── simulator.py       # Paper trading engine
+│   ├── simulator.py       # Paper trading engine (supports double-downs)
 │   ├── journal.py         # SQLite trade log
-│   └── cli.py             # Typer entrypoint
+│   ├── resolver.py        # Trade resolution against actual weather
+│   ├── server.py          # FastAPI web dashboard backend
+│   └── cli.py             # Typer entrypoint (scan/sim/resolve/report/status/serve)
+├── admin-panel.html           # Web dashboard UI
 ├── tests/
 │   ├── test_sizing.py
 │   ├── test_limits.py
 │   ├── test_strategy.py
+│   ├── test_simulator.py
+│   ├── test_journal.py
+│   ├── test_noaa.py
+│   ├── test_polymarket.py
+│   ├── test_resolver.py
+│   ├── test_server.py
 │   └── fixtures/          # Sample NOAA + market data
 └── data/
     └── trades.db
@@ -98,7 +107,7 @@ Flat `src/` is intentional — the codebase is small enough that subdirectories 
 5. **Compare** NOAA probability vs Polymarket price
 6. **Signal** if absolute discrepancy > threshold (default: 10 percentage points)
 7. **Size** using quarter-Kelly: `f* = 0.25 × (p_noaa - p_market) / (1 - p_market)`
-8. **Check** all limits (bankroll, position cap, daily loss)
+8. **Check** all limits (bankroll, position cap, daily loss). If a position already exists for this market, cap the new trade to remaining room under the position limit (double-down). Skip only if fully capped.
 9. **Execute** paper trade in simulator and log to SQLite
 
 ### NOAA Data Sources
@@ -119,7 +128,7 @@ Non-negotiable. Code must enforce all of these.
 
 1. **Simulation only.** V0 has no live trading code path. Period.
 2. **Hard bankroll ceiling.** `MAX_BANKROLL` set in `.env`. Simulator refuses trades that would exceed it.
-3. **Per-position cap: 5% of bankroll.** No single position larger than this.
+3. **Per-position cap.** `POSITION_CAP_PCT` of bankroll (default 25%, configurable up to 50%). Total exposure per market (including double-downs) cannot exceed this.
 4. **Quarter-Kelly only.** Kelly fraction × 0.25, always.
 5. **Minimum edge threshold.** Don't trade unless NOAA-vs-market gap ≥ 10% (configurable).
 6. **Daily loss limit: -5%.** If sim P&L drops 5% intraday, halt for the day.
@@ -194,7 +203,7 @@ POLYMARKET_API_PASSPHRASE=...
 
 # Trading config
 MAX_BANKROLL=500
-POSITION_CAP_PCT=0.05
+POSITION_CAP_PCT=0.25
 KELLY_FRACTION=0.25
 DAILY_LOSS_LIMIT_PCT=0.05
 MIN_EDGE_THRESHOLD=0.10
@@ -215,8 +224,17 @@ uv run python -m src.cli scan
 # Run simulation with $500 bankroll
 uv run python -m src.cli sim --bankroll 500
 
+# Resolve past trades against actual weather outcomes
+uv run python -m src.cli resolve
+
 # View paper P&L
 uv run python -m src.cli report --days 30
+
+# Check current config and kill switch status
+uv run python -m src.cli status
+
+# Start the web dashboard (Weather Edge Tracker)
+uv run python -m src.cli serve
 
 # Run tests
 uv run pytest tests/ -v

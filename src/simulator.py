@@ -16,7 +16,6 @@ from src.limits import (
     check_bankroll_limit,
     check_daily_loss,
     check_kill_switch,
-    check_position_limit,
 )
 from src.models import NOAAForecast, Portfolio, Signal, Trade, WeatherMarket
 from src.noaa import NOAAClient
@@ -198,17 +197,28 @@ class Simulator:
             market_lookup[market.market_id] = market
 
         for signal in signals:
-            # Check for existing open trade on this market
-            if self._journal.has_open_trade(signal.market_id):
+            # Check existing exposure and cap to remaining room under position limit
+            max_position = self._max_bankroll * self._position_cap_pct
+            existing_size = self._journal.get_open_position_size(signal.market_id)
+            remaining_room = max_position - existing_size
+
+            if remaining_room <= Decimal("0"):
                 logger.info(
-                    "skipping_duplicate_market",
+                    "skipping_position_full",
                     market_id=signal.market_id,
+                    existing=str(existing_size),
+                    cap=str(max_position),
                 )
                 self._last_skip_reasons.append({
                     "market_id": signal.market_id,
-                    "reason": "Already have an open bet on this market",
+                    "reason": (
+                        f"Position full: ${existing_size} deployed, "
+                        f"cap is ${max_position}"
+                    ),
                 })
                 continue
+
+            is_double_down = existing_size > Decimal("0")
 
             # Pre-execution limit checks
             allowed, reason = check_kill_switch(self._kill_switch)
@@ -232,20 +242,18 @@ class Simulator:
                 continue
 
             trade_size = signal.recommended_size
-            allowed, reason = check_position_limit(
-                trade_size,
-                self._max_bankroll,
-                self._position_cap_pct,
-            )
-            if not allowed:
-                # Cap to position limit instead of rejecting
-                trade_size = self._max_bankroll * self._position_cap_pct
+
+            # Cap to remaining room under position limit
+            if trade_size > remaining_room:
                 logger.info(
                     "trade_size_capped",
                     market_id=signal.market_id,
-                    original=str(signal.recommended_size),
-                    capped=str(trade_size),
+                    original=str(trade_size),
+                    capped=str(remaining_room),
+                    existing=str(existing_size),
+                    double_down=is_double_down,
                 )
+                trade_size = remaining_room
 
             allowed, reason = check_bankroll_limit(
                 cash=self._portfolio.cash,
@@ -351,6 +359,8 @@ class Simulator:
                 side=trade.side,
                 size=str(trade.size),
                 edge=str(trade.edge),
+                double_down=is_double_down,
+                total_position=str(existing_size + trade_size),
             )
 
         # Save daily snapshot
