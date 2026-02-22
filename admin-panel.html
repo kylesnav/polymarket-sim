@@ -424,6 +424,7 @@ tbody tr:last-child td { border-bottom: none; }
     <button class="tab-btn" data-tab="scan">Scan Markets</button>
     <button class="tab-btn" data-tab="simulate">Find &amp; Place Bets</button>
     <button class="tab-btn" data-tab="history">My Bets</button>
+    <button class="tab-btn" data-tab="positions">Positions &amp; P&amp;L</button>
     <button class="tab-btn" data-tab="logs">Activity Log</button>
     <button class="tab-btn" data-tab="settings">Settings</button>
     <button class="tab-btn" data-tab="how">How It Works</button>
@@ -656,6 +657,76 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: POSITIONS & P&L                                -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-positions">
+    <div class="section-header">
+      <div class="section-title">Positions &amp; P&amp;L</div>
+      <div class="section-controls">
+        <button class="action-btn" onclick="loadPositions()">Refresh</button>
+      </div>
+    </div>
+    <p class="tab-description">Estimated profit &amp; loss for all open positions. <strong>Expected P&amp;L</strong> is weighted by NOAA forecast probability. <strong>Max Profit</strong> assumes every bet wins.</p>
+
+    <!-- Summary cards -->
+    <div class="cards-row" id="posCards">
+      <div class="card accent-green">
+        <div class="card-label">Open Positions</div>
+        <div class="card-value" id="posCount">--</div>
+      </div>
+      <div class="card accent-blue">
+        <div class="card-label">Total Exposure</div>
+        <div class="card-value" id="posExposure">--</div>
+      </div>
+      <div class="card accent-pnl">
+        <div class="card-label">Expected P&amp;L <span class="tip" data-tip="Probability-weighted estimate. Each position's P&L is weighted by the NOAA forecast probability of winning.">?</span></div>
+        <div class="card-value" id="posExpectedPnl">--</div>
+        <div class="card-sub" id="posExpectedReturn"></div>
+      </div>
+      <div class="card accent-green">
+        <div class="card-label">Max Profit <span class="tip" data-tip="Best-case scenario: every open bet wins and pays out at $1.">?</span></div>
+        <div class="card-value" id="posMaxProfit">--</div>
+        <div class="card-sub" id="posMaxLoss"></div>
+      </div>
+    </div>
+
+    <!-- Scenario bar -->
+    <div class="table-section" id="posScenarioWrap" style="display:none">
+      <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-3);margin-bottom:10px;font-weight:600">P&amp;L Range</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;margin-bottom:6px">
+        <span style="color:var(--red);font-weight:600" id="scenarioLoss">--</span>
+        <div style="flex:1;position:relative;height:24px;background:linear-gradient(90deg,var(--red-bg),var(--bg-input) 40%,var(--bg-input) 60%,var(--green-bg));border-radius:12px;border:1px solid var(--border);overflow:hidden">
+          <div id="scenarioMarker" style="position:absolute;top:2px;bottom:2px;width:3px;border-radius:2px;background:var(--blue);transition:left 0.3s"></div>
+        </div>
+        <span style="color:var(--green);font-weight:600" id="scenarioProfit">--</span>
+      </div>
+      <div style="text-align:center;font-size:0.72rem;color:var(--text-2)" id="scenarioExpected"></div>
+    </div>
+
+    <!-- Positions table -->
+    <div class="table-section">
+      <table>
+        <thead>
+          <tr>
+            <th>Market</th>
+            <th>Side</th>
+            <th>Stake</th>
+            <th>Entry</th>
+            <th>NOAA Prob</th>
+            <th>Max Profit</th>
+            <th>Max Loss</th>
+            <th>Expected P&amp;L</th>
+            <th>Event</th>
+          </tr>
+        </thead>
+        <tbody id="posTableBody">
+          <tr class="empty-row"><td colspan="9">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
   <!-- TAB: ACTIVITY LOG                                   -->
   <!-- ═══════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-logs">
@@ -846,6 +917,7 @@ let tradesData = [];
 let snapshotsData = [];
 let signalsData = [];
 let simSignalsData = [];
+let positionsData = { positions: [], summary: {} };
 let currentRange = 30;
 let logCursor = 0;
 let logAutoScroll = true;
@@ -918,7 +990,7 @@ function countdownText(daysUntil) {
 // ═══════════════════════════════════════
 
 async function loadAll() {
-  await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades(), loadSnapshots()]);
+  await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades(), loadSnapshots(), loadPositions()]);
   renderReport(); // Re-render after snapshots are loaded (fixes race condition)
   updateOnboarding();
 }
@@ -1058,6 +1130,27 @@ function renderPortfolio() {
   const actEl = document.getElementById('cardActualPnl');
   actEl.textContent = (actPnl >= 0 ? '+' : '') + '$' + actPnl.toFixed(2);
   actEl.className = 'card-value ' + (actPnl >= 0 ? 'positive' : 'negative');
+
+  // Show expected P&L from open positions on the P&L card
+  const expectedPnl = p.estimated_expected_pnl || 0;
+  const pnlSub = document.getElementById('cardPnlSub');
+  if (openCount > 0 && expectedPnl !== 0) {
+    const sign = expectedPnl >= 0 ? '+' : '';
+    pnlSub.innerHTML = `Open: <span style="color:${expectedPnl >= 0 ? 'var(--green)' : 'var(--red)'}">${sign}$${expectedPnl.toFixed(2)}</span> expected`;
+  } else {
+    pnlSub.textContent = '';
+  }
+
+  // Show expected P&L on the Open Bets card
+  const openSub = document.getElementById('cardOpenSub');
+  if (openCount > 0 && expectedPnl !== 0) {
+    const sign = expectedPnl >= 0 ? '+' : '';
+    openSub.innerHTML = `${sign}$${expectedPnl.toFixed(2)} expected P&amp;L`;
+    openSub.style.color = expectedPnl >= 0 ? 'var(--green)' : 'var(--red)';
+  } else {
+    openSub.textContent = 'awaiting weather';
+    openSub.style.color = '';
+  }
 
   // Find earliest open event date for next steps
   renderNextSteps(openCount, readyCount, p.resolved || 0);
@@ -1759,6 +1852,88 @@ document.querySelectorAll('.pill-btn[data-range]').forEach(btn => {
     drawChart();
   });
 });
+
+// ═══════════════════════════════════════
+//  POSITIONS & P&L
+// ═══════════════════════════════════════
+
+async function loadPositions() {
+  try {
+    positionsData = await api('GET', '/api/positions');
+    renderPositions();
+  } catch (e) { console.error('positions load failed', e); }
+}
+
+function renderPositions() {
+  const positions = positionsData.positions ?? [];
+  const summary = positionsData.summary ?? {};
+
+  // Summary cards
+  document.getElementById('posCount').textContent = summary.position_count || 0;
+
+  const exposure = summary.total_exposure || 0;
+  document.getElementById('posExposure').textContent = '$' + exposure.toFixed(2);
+
+  const expectedPnl = summary.total_expected_pnl || 0;
+  const expectedEl = document.getElementById('posExpectedPnl');
+  expectedEl.textContent = (expectedPnl >= 0 ? '+' : '') + '$' + expectedPnl.toFixed(2);
+  expectedEl.className = 'card-value ' + (expectedPnl >= 0 ? 'positive' : 'negative');
+
+  const expectedReturn = summary.total_expected_return || 0;
+  document.getElementById('posExpectedReturn').textContent = (expectedReturn * 100).toFixed(1) + '% expected return';
+
+  const maxProfit = summary.total_max_profit || 0;
+  const maxProfitEl = document.getElementById('posMaxProfit');
+  maxProfitEl.textContent = '+$' + maxProfit.toFixed(2);
+  maxProfitEl.className = 'card-value positive';
+
+  const maxLoss = summary.total_max_loss || 0;
+  document.getElementById('posMaxLoss').textContent = 'Max loss: -$' + Math.abs(maxLoss).toFixed(2);
+
+  // Scenario bar
+  const scenarioWrap = document.getElementById('posScenarioWrap');
+  if (positions.length > 0) {
+    scenarioWrap.style.display = 'block';
+    document.getElementById('scenarioLoss').textContent = '-$' + Math.abs(maxLoss).toFixed(0);
+    document.getElementById('scenarioProfit').textContent = '+$' + maxProfit.toFixed(0);
+
+    const range = maxProfit - maxLoss;
+    const markerPos = range > 0 ? ((expectedPnl - maxLoss) / range) * 100 : 50;
+    document.getElementById('scenarioMarker').style.left = Math.max(2, Math.min(98, markerPos)) + '%';
+    document.getElementById('scenarioExpected').textContent = 'Expected: ' + (expectedPnl >= 0 ? '+' : '') + '$' + expectedPnl.toFixed(2);
+  } else {
+    scenarioWrap.style.display = 'none';
+  }
+
+  // Table
+  const tbody = document.getElementById('posTableBody');
+  if (!positions.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No open positions. Place bets to see P&L estimates.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = positions.map(pos => {
+    const desc = makeBetDescription(pos);
+    const sideBadge = pos.side === 'YES' ? '<span class="badge badge-yes">YES</span>' : '<span class="badge badge-no">NO</span>';
+    const maxProfitCls = 'val-pos';
+    const maxLossCls = 'val-neg';
+    const expectedCls = pos.expected_pnl >= 0 ? 'val-pos' : 'val-neg';
+    const eventStr = pos.event_date ? formatDate(pos.event_date) : '';
+    const daysStr = pos.days_until_event != null ? ` (${pos.days_until_event}d)` : '';
+
+    return `<tr onclick="openTradeModal('${pos.trade_id}')">
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${desc}">${desc}</td>
+      <td>${sideBadge}</td>
+      <td>$${pos.size.toFixed(2)}</td>
+      <td>${pos.entry_price.toFixed(2)}</td>
+      <td>${(pos.noaa_probability * 100).toFixed(0)}%</td>
+      <td class="${maxProfitCls}">+$${pos.max_profit.toFixed(2)}</td>
+      <td class="${maxLossCls}">-$${Math.abs(pos.max_loss).toFixed(2)}</td>
+      <td class="${expectedCls}" style="font-weight:600">${pos.expected_pnl >= 0 ? '+' : ''}$${pos.expected_pnl.toFixed(2)}</td>
+      <td>${eventStr}${daysStr}</td>
+    </tr>`;
+  }).join('');
+}
 
 // ═══════════════════════════════════════
 //  INIT

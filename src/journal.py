@@ -26,6 +26,7 @@ from src.queries import (
     get_lifecycle_counts,
     get_market_metadata,
     get_open_position_size,
+    get_open_positions_with_pnl,
     get_portfolio_summary,
     get_report_data,
     get_snapshots,
@@ -321,6 +322,14 @@ class Journal:
             List of snapshot dicts ordered by date ascending.
         """
         return get_snapshots(self._conn, days)
+
+    def get_open_positions_with_pnl(self) -> dict[str, Any]:
+        """Get all open positions with P&L estimates.
+
+        Returns:
+            Dict with "positions" list and "summary" aggregates.
+        """
+        return get_open_positions_with_pnl(self._conn)
 
     def get_report_data(self, days: int = 30) -> dict[str, Any]:
         """Get summary report data for the last N days.

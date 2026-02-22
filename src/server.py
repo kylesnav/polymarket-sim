@@ -466,10 +466,33 @@ def get_portfolio(
     settings: Annotated[Settings, Depends(get_settings)],
     journal: Annotated[Journal, Depends(get_journal)],
 ) -> JSONResponse:
-    """Get computed portfolio state from trade history."""
+    """Get computed portfolio state from trade history, including P&L estimates."""
     try:
         summary = journal.get_portfolio_summary(Decimal(str(settings.max_bankroll)))
+        pnl_data = journal.get_open_positions_with_pnl()
+        pnl_summary = pnl_data["summary"]
+        summary["estimated_max_profit"] = pnl_summary["total_max_profit"]
+        summary["estimated_max_loss"] = pnl_summary["total_max_loss"]
+        summary["estimated_expected_pnl"] = pnl_summary["total_expected_pnl"]
         return _json(summary)
+    except Exception as e:
+        logger.error("portfolio_failed", error=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        journal.close()
+
+
+@app.get("/api/positions")
+def get_positions(
+    journal: Annotated[Journal, Depends(get_journal)],
+) -> JSONResponse:
+    """Get open positions with per-trade and aggregate P&L estimates."""
+    try:
+        data = journal.get_open_positions_with_pnl()
+        return _json(data)
+    except Exception as e:
+        logger.error("positions_failed", error=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         journal.close()
 

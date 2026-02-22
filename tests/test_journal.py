@@ -665,6 +665,99 @@ class TestGetReportData:
         assert report["actual_pnl"] == Decimal("15.00")
 
 
+class TestOpenPositionsWithPnl:
+    """Tests for get_open_positions_with_pnl P&L calculations."""
+
+    def test_empty_positions(self) -> None:
+        """Empty journal returns zero summary."""
+        j = _make_journal()
+        data = j.get_open_positions_with_pnl()
+        j.close()
+
+        assert data["positions"] == []
+        assert data["summary"]["position_count"] == 0
+        assert data["summary"]["total_expected_pnl"] == Decimal("0")
+
+    def test_yes_side_pnl(self) -> None:
+        """YES trade: win probability = noaa_probability."""
+        j = _make_journal()
+        t = _make_trade(
+            trade_id="pnl01", price="0.40", size="100.00",
+            noaa_probability="0.70", side="YES",
+        )
+        j.log_trade(t)
+        j.update_trade_status("pnl01", "filled")
+
+        data = j.get_open_positions_with_pnl()
+        j.close()
+
+        pos = data["positions"][0]
+        # effective_price = 0.40, max_profit = 100*(1-0.4)/0.4 = 150
+        assert pos["max_profit"] == Decimal("150.00")
+        assert pos["max_loss"] == Decimal("-100.00")
+        # expected = 0.70*150 + 0.30*(-100) = 105 - 30 = 75
+        assert pos["expected_pnl"] == Decimal("75.00")
+
+    def test_no_side_pnl_uses_inverted_probability(self) -> None:
+        """NO trade: win probability = 1 - noaa_probability."""
+        j = _make_journal()
+        # noaa_prob=0.30 means 30% chance event happens, 70% chance NO wins
+        t = _make_trade(
+            trade_id="pnl02", price="0.60", size="50.00",
+            noaa_probability="0.30", side="NO",
+        )
+        j.log_trade(t)
+        j.update_trade_status("pnl02", "filled")
+
+        data = j.get_open_positions_with_pnl()
+        j.close()
+
+        pos = data["positions"][0]
+        # NO side: effective_price = 1 - 0.60 = 0.40
+        # max_profit = 50*(1-0.4)/0.4 = 75
+        assert pos["max_profit"] == Decimal("75.00")
+        assert pos["max_loss"] == Decimal("-50.00")
+        # win_prob = 1 - 0.30 = 0.70
+        # expected = 0.70*75 + 0.30*(-50) = 52.5 - 15 = 37.50
+        assert pos["expected_pnl"] == Decimal("37.50")
+
+    def test_aggregates_multiple_positions(self) -> None:
+        """Summary aggregates across multiple open positions."""
+        j = _make_journal()
+        t1 = _make_trade(
+            trade_id="pnl03", market_id="m1", price="0.50",
+            size="40.00", noaa_probability="0.60", side="YES",
+        )
+        t2 = _make_trade(
+            trade_id="pnl04", market_id="m2", price="0.80",
+            size="60.00", noaa_probability="0.20", side="NO",
+        )
+        j.log_trade(t1)
+        j.log_trade(t2)
+        j.update_trade_status("pnl03", "filled")
+        j.update_trade_status("pnl04", "filled")
+
+        data = j.get_open_positions_with_pnl()
+        j.close()
+
+        assert data["summary"]["position_count"] == 2
+        assert data["summary"]["total_exposure"] == Decimal("100.00")
+
+    def test_excludes_resolved_trades(self) -> None:
+        """Resolved trades should not appear in positions."""
+        j = _make_journal()
+        t = _make_trade(trade_id="pnl05")
+        j.log_trade(t)
+        j.update_trade_status("pnl05", "filled")
+        j.update_trade_resolution("pnl05", "won", Decimal("10.00"))
+
+        data = j.get_open_positions_with_pnl()
+        j.close()
+
+        assert data["positions"] == []
+        assert data["summary"]["position_count"] == 0
+
+
 class TestDailySnapshots:
     """Tests for save_daily_snapshot and get_snapshots."""
 
