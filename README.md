@@ -53,7 +53,7 @@ uv run python -m src.cli sim --bankroll 1000
 
 This does everything `scan` does, plus executes paper trades. For each signal:
 - Sizes the position using quarter-Kelly (conservative — never bets more than the math says)
-- Caps it at 5% of bankroll (no single bet can blow you up)
+- Caps total exposure per market at `POSITION_CAP_PCT` of bankroll (default 25%). If you already have a position, it adds to it up to the cap (double-down).
 - Checks the daily loss limit (halts if you're down 5% for the day)
 - Logs the trade intent to SQLite *before* recording the fill (if the log fails, the trade doesn't happen)
 
@@ -123,6 +123,14 @@ uv run python -m src.cli status
 
 Prints current settings and whether the kill switch is engaged.
 
+### 6. Web dashboard
+
+```bash
+uv run python -m src.cli serve
+```
+
+Opens the Weather Edge Tracker at http://127.0.0.1:8000. Everything available in the CLI is also available through the web interface — scan, simulate, resolve, view trades, adjust settings, and toggle the kill switch. The dashboard includes tooltips and a "How It Works" tab for onboarding.
+
 ## Configuration
 
 Edit `.env` to adjust trading parameters:
@@ -130,7 +138,7 @@ Edit `.env` to adjust trading parameters:
 | Variable | Default | What it does |
 |---|---|---|
 | `MAX_BANKROLL` | `500` | Hard cap on total portfolio value. Trades rejected if they'd exceed this. |
-| `POSITION_CAP_PCT` | `0.05` | No single trade larger than 5% of bankroll. |
+| `POSITION_CAP_PCT` | `0.25` | Max total exposure per market as fraction of bankroll (default 25% = $125 on a $500 bankroll). Supports double-downs up to the cap. Configurable 0–50%. |
 | `KELLY_FRACTION` | `0.25` | Quarter-Kelly sizing. Lower = more conservative. |
 | `MIN_EDGE_THRESHOLD` | `0.10` | Ignore signals with less than 10% gap between NOAA and market. |
 | `DAILY_LOSS_LIMIT_PCT` | `0.05` | Stop trading for the day if sim P&L drops 5%. |
@@ -148,9 +156,9 @@ Example: NOAA says 80% probability, market price is $0.55.
 - Full Kelly fraction = (0.80 - 0.55) / (1 - 0.55) = 0.556
 - Quarter-Kelly fraction = 0.556 × 0.25 = 0.139
 - On a $500 bankroll: position = $500 × 0.139 = $69.44
-- But position cap is 5% of bankroll ($25), so final size = $25.00
+- But position cap is 25% of bankroll ($125), so final size = $69.44
 
-The position cap acts as a hard ceiling regardless of what Kelly says.
+If you already have $50 deployed on this market, the bot will add up to $75 more (the remaining room under the $125 cap). This double-down behavior means the bot can increase positions on markets where the edge persists, rather than leaving cash idle.
 
 ## Where Data Lives
 
@@ -230,7 +238,7 @@ If you're running this daily, the cadence is:
 2. `resolve` every few days (settles trades after their event dates pass)
 3. `report` whenever you want to check P&L
 
-That's it. No daemons, no scheduler, no background processes.
+That's it. No daemons, no scheduler, no background processes. Or just run `uv run python -m src.cli serve` and do everything from the web dashboard.
 
 ## What's NOT in V0
 

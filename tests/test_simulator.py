@@ -88,6 +88,7 @@ def sim() -> Simulator:
     s._polymarket = MagicMock()
     s._noaa = MagicMock()
     s._journal = MagicMock()
+    s._journal.get_open_position_size.return_value = Decimal("0")
     s._portfolio = Portfolio(
         cash=Decimal("500"),
         total_value=Decimal("500"),
@@ -164,15 +165,49 @@ class TestExecuteSignals:
         sim._journal.log_trade.assert_called_once()
         sim._journal.update_trade_status.assert_called_once()
 
-    def test_skips_duplicate_market(self, sim: Simulator) -> None:
+    def test_skips_when_position_full(self, sim: Simulator) -> None:
         sim._last_markets = [_make_market()]
-        sim._journal.has_open_trade.return_value = True
+        # Position already at cap: 5% of $500 = $25
+        sim._journal.get_open_position_size.return_value = Decimal("25")
 
         signal = _make_signal()
         trades = sim.execute_signals([signal])
 
         assert len(trades) == 0
         sim._journal.log_trade.assert_not_called()
+
+    def test_double_down_with_remaining_room(self, sim: Simulator) -> None:
+        market = _make_market()
+        sim._last_markets = [market]
+        sim._last_forecasts = {market.market_id: _make_forecast()}
+        # Existing position of $10, cap is $25, so $15 room remains
+        sim._journal.get_open_position_size.return_value = Decimal("10")
+        sim._journal.log_trade.return_value = True
+        sim._journal.update_trade_status.return_value = True
+        sim._journal.cache_market.return_value = True
+
+        # Signal wants $20 but only $15 room — should be capped
+        signal = _make_signal(size=Decimal("20.00"))
+        trades = sim.execute_signals([signal])
+
+        assert len(trades) == 1
+        assert trades[0].size == Decimal("15")
+
+    def test_double_down_fits_within_room(self, sim: Simulator) -> None:
+        market = _make_market()
+        sim._last_markets = [market]
+        sim._last_forecasts = {market.market_id: _make_forecast()}
+        # Existing $15, cap $25, room $10 — signal fits
+        sim._journal.get_open_position_size.return_value = Decimal("15")
+        sim._journal.log_trade.return_value = True
+        sim._journal.update_trade_status.return_value = True
+        sim._journal.cache_market.return_value = True
+
+        signal = _make_signal(size=Decimal("8.00"))
+        trades = sim.execute_signals([signal])
+
+        assert len(trades) == 1
+        assert trades[0].size == Decimal("8.00")
 
     def test_kill_switch_blocks_execution(self, sim: Simulator) -> None:
         sim._kill_switch = True

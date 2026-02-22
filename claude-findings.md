@@ -50,11 +50,11 @@ Refactored the Polymarket weather bot from a developer-facing "Admin Panel" into
 
 ---
 
-## Files NOT Modified
+## Files NOT Modified (during UI refactor)
 
-`models.py`, `strategy.py`, `sizing.py`, `limits.py`, `noaa.py`, `polymarket.py`, `backtest.py`, `resolver.py`, `journal.py`, `config.py`, `pyproject.toml`, all test files.
+`models.py`, `strategy.py`, `sizing.py`, `limits.py`, `noaa.py`, `polymarket.py`, `backtest.py`, `resolver.py`, `pyproject.toml`.
 
-The backend logic is untouched. All changes are in the API layer and UI.
+The core strategy and sizing logic is untouched. Subsequent changes to `journal.py`, `simulator.py`, `config.py`, and `test_simulator.py` were made for the double-down feature (see below).
 
 ---
 
@@ -74,7 +74,7 @@ The backend logic is untouched. All changes are in the API layer and UI.
 
 ## Verification
 
-- **All 69 tests pass** (pytest, 3.48s)
+- **All 186 tests pass** (pytest, ~10s)
 - Server starts with `uv run python -m src.cli serve`
 - First-time users see onboarding card with clear instructions
 - All operations (scan, simulate, resolve, backtest) available through UI
@@ -82,6 +82,35 @@ The backend logic is untouched. All changes are in the API layer and UI.
 - Activity log updates in real time during operations
 - Kill switch toggles from both topbar and settings tab
 - Scan results persist across page reloads via localStorage
+
+---
+
+## Post-Refactor: Double-Down & Position Cap Changes
+
+### Problem
+With only ~4 active weather markets and a 5% per-position cap ($25/market), only $100 of the $500 bankroll could be deployed. The simulator had a hard binary gate: any existing trade for a market = skip entirely. No concept of adding to positions.
+
+### Changes Made
+
+1. **`src/journal.py`** — Added `get_open_position_size(market_id)` method. Returns total $ deployed on a market (sum of sizes for pending/filled trades), or zero if none.
+
+2. **`src/simulator.py`** — Replaced the hard duplicate-market skip in `execute_signals()` with position-aware logic:
+   - Calculates `remaining_room = position_cap - existing_size` for each market
+   - If no room left (fully capped), skips with a clear reason message
+   - If room remains, allows additional trades capped to remaining room
+   - Logs whether each trade is a double-down and total position size after fill
+
+3. **`src/config.py`** — Raised `POSITION_CAP_PCT` validator ceiling from 20% to 50%.
+
+4. **`.env` / `.env.example`** — Bumped `POSITION_CAP_PCT` from 5% to 25% (each market can hold up to $125 on a $500 bankroll).
+
+5. **`tests/test_simulator.py`** — Updated duplicate-skip test to test position-full behavior. Added two new tests:
+   - `test_double_down_with_remaining_room` — signal capped to remaining room
+   - `test_double_down_fits_within_room` — signal fits under cap, no capping needed
+
+### Verification
+- All 186 tests pass (pytest, ~10s)
+- No changes to strategy, sizing, limits, or resolution logic
 
 ---
 

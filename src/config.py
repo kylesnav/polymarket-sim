@@ -51,9 +51,9 @@ class Settings(BaseSettings):
     @field_validator("position_cap_pct")
     @classmethod
     def position_cap_in_range(cls, v: float) -> float:
-        """Validate position cap is between 0 and 0.2."""
-        if not 0 < v <= 0.2:
-            msg = "POSITION_CAP_PCT must be between 0 (exclusive) and 0.2 (inclusive)"
+        """Validate position cap is between 0 and 0.5."""
+        if not 0 < v <= 0.5:
+            msg = "POSITION_CAP_PCT must be between 0 (exclusive) and 0.5 (inclusive)"
             raise ValueError(msg)
         return v
 
