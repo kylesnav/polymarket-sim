@@ -2,6 +2,18 @@
 
 Paper-trades weather contracts on [Polymarket](https://polymarket.com) by spotting mispricings between market odds and [NOAA](https://www.weather.gov/) government forecasts. No real money, no live trading — just simulation to prove the edge before risking anything.
 
+## Quick Start
+
+```bash
+git clone https://github.com/kylesnav/polymarket-sim.git
+cd polymarket-sim
+uv sync
+cp .env.example .env   # Edit with your Polymarket API keys (optional for simulation)
+uv run python -m src.cli scan   # Scan for mispriced weather markets
+```
+
+Requires **Python 3.12+** and [uv](https://docs.astral.sh/uv/). Polymarket API keys are optional — the bot uses the public Gamma API for market discovery.
+
 ## Why This Works
 
 NOAA temperature forecasts are 85–90% accurate at 1–2 day horizons. Polymarket's weather markets are thin and driven by casual bettors who don't check NOAA data. When NOAA says there's an 80% chance NYC hits 75°F tomorrow but the market is pricing YES at $0.55, that's a 25-cent edge.
@@ -239,6 +251,42 @@ If you're running this daily, the cadence is:
 3. `report` whenever you want to check P&L
 
 That's it. No daemons, no scheduler, no background processes. Or just run `uv run python -m src.cli serve` and do everything from the web dashboard.
+
+## Troubleshooting
+
+### API key / configuration errors
+
+- **`ValidationError` on startup**: The bot validates all `.env` values with Pydantic. Check that numeric values are in range (e.g., `KELLY_FRACTION` must be between 0 and 1, `POSITION_CAP_PCT` between 0 and 0.5). Run `uv run python -m src.cli status` to verify your current configuration.
+- **Polymarket API keys not working**: API keys (`POLYMARKET_API_KEY`, `POLYMARKET_API_SECRET`, `POLYMARKET_API_PASSPHRASE`) are optional for V0 simulation. The bot uses Polymarket's public Gamma API for market discovery, so you can leave them as `...` in `.env`.
+- **`.env` file not found**: Make sure you copied the example file: `cp .env.example .env`. The bot loads settings from `.env` in the project root.
+
+### Rate limiting
+
+- **NOAA API returning 429 or 503 errors**: The bot has a built-in token bucket rate limiter (10 requests/sec for NOAA, 5 requests/sec for Polymarket) with automatic retry and exponential backoff (3 attempts at 1s/2s/4s intervals). If you still hit limits, wait a few minutes and try again. NOAA's `api.weather.gov` can be slow or intermittent — this is normal.
+- **Polymarket Gamma API errors**: The Gamma API is rate-limited. The bot retries automatically with backoff. If errors persist, check [Polymarket's status page](https://polymarket.com) or try again later.
+- **Timeouts**: Both NOAA and Polymarket clients use a 30-second timeout. If you're on a slow connection, requests may time out before retries are exhausted.
+
+### Database / storage errors
+
+- **`sqlite3.OperationalError: unable to open database file`**: The bot stores trades in `data/trades.db`. Make sure the `data/` directory exists (it should be created automatically, but you can run `mkdir -p data` if needed).
+- **Database locked errors**: SQLite doesn't support concurrent writes well. Avoid running multiple bot instances simultaneously (e.g., `sim` and `resolve` at the same time).
+- **Corrupt database**: If `trades.db` becomes corrupted, you can safely delete it — `rm data/trades.db` — and the bot will create a fresh one on next run. You'll lose historical trade data.
+
+### Missing dependencies
+
+- **`ModuleNotFoundError`**: Run `uv sync` to install all dependencies. Make sure you're using Python 3.12+ (`python --version`).
+- **`py-clob-client` import errors**: This is Polymarket's official CLOB client. It's untyped, so pyright may show warnings — these are expected and suppressed in the project config.
+- **uv not found**: Install uv first: `curl -LsSf https://astral.sh/uv/install.sh | sh` (see [uv docs](https://docs.astral.sh/uv/)).
+
+### No markets or signals found
+
+- **`Found 0 signal(s)`**: This is normal — it means no weather markets currently have an edge above your `MIN_EDGE_THRESHOLD` (default 10%). Lower the threshold in `.env` if you want to see more signals, but smaller edges are less reliable.
+- **Markets for unsupported cities**: The bot only supports ~60 major US cities. Markets for other locations are silently skipped. Check `src/polymarket.py` for the full `CITY_COORDS` list.
+- **Kill switch engaged**: If the bot refuses to scan or trade, check that `KILL_SWITCH=false` in `.env`. Run `uv run python -m src.cli status` to verify.
+
+### Debug logging
+
+Set `LOG_LEVEL=DEBUG` in `.env` to see every API call, parsing decision, and sizing calculation. This is the fastest way to diagnose unexpected behavior.
 
 ## What's NOT in V0
 
