@@ -196,6 +196,71 @@ def _print_dry_run(signals: list[Signal]) -> None:
 
 
 @app.command()
+def positions() -> None:
+    """Show open positions with estimated P&L (max, expected)."""
+    settings = Settings()
+    _configure_logging(settings.log_level)
+
+    journal = Journal()
+    try:
+        data = journal.get_open_positions_with_pnl()
+        pos_list = data["positions"]
+        summary = data["summary"]
+
+        if not pos_list:
+            typer.echo("No open positions.")
+            return
+
+        typer.echo(f"=== Open Positions ({summary['position_count']}) ===\n")
+        typer.echo(
+            f"{'Market':<40} {'Side':<5} {'Stake':>8} {'NOAA':>6} "
+            f"{'Edge':>7} {'MaxProfit':>10} {'Expected':>10} {'Event':>12}"
+        )
+        typer.echo("-" * 104)
+
+        for pos in pos_list:
+            question = pos["question"][:39] if pos["question"] else pos["market_id"][:39]
+            event_str = ""
+            if pos["event_date"]:
+                event_str = str(pos["event_date"])
+                if pos["days_until_event"] is not None:
+                    event_str += f" ({pos['days_until_event']}d)"
+
+            typer.echo(
+                f"{question:<40} {pos['side']:<5} "
+                f"${pos['size']:>7.2f} "
+                f"{pos['noaa_probability']:>6.2f} "
+                f"{pos['edge']:>+7.2f} "
+                f"${pos['max_profit']:>+9.2f} "
+                f"${pos['expected_pnl']:>+9.2f} "
+                f"{event_str:>12}"
+            )
+
+        typer.echo("-" * 104)
+        typer.echo("\n=== Portfolio P&L Estimate ===")
+        typer.echo(f"Total Exposure:    ${summary['total_exposure']:.2f}")
+        typer.echo(
+            f"Expected P&L:      ${summary['total_expected_pnl']:+.2f}"
+            f" ({float(summary['total_expected_return']):.1%} return)"
+        )
+        typer.echo(
+            f"Max Profit:        ${summary['total_max_profit']:+.2f}"
+            f" (best case — all bets win)"
+        )
+        typer.echo(
+            f"Max Loss:          ${summary['total_max_loss']:+.2f}"
+            f" (worst case — all bets lose)"
+        )
+
+        # Also show realized P&L if any
+        report = journal.get_report_data(days=365)
+        if report["resolved_trades"]:
+            typer.echo(f"Actual P&L:        ${report['actual_pnl']:+.2f} (resolved bets)")
+    finally:
+        journal.close()
+
+
+@app.command()
 def resolve() -> None:
     """Resolve unresolved trades against actual NOAA weather outcomes."""
     settings = Settings()

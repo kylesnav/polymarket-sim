@@ -580,6 +580,113 @@ def get_snapshots(conn: sqlite3.Connection, days: int = 60) -> list[dict[str, ob
     ]
 
 
+def get_open_positions_with_pnl(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Get all open positions with per-trade and aggregate P&L estimates.
+
+    For each filled trade, computes:
+    - max_profit: payout if contract wins (pays $1)
+    - max_loss: total loss of stake (-size)
+    - expected_pnl: probability-weighted estimate using NOAA probability
+    - expected_return: expected_pnl / size
+
+    Args:
+        conn: SQLite database connection.
+
+    Returns:
+        Dict with "positions" list and "summary" aggregates.
+    """
+    today = date.today()
+    cursor = conn.cursor()
+    cursor.execute(
+        """SELECT * FROM trades WHERE status = 'filled' ORDER BY timestamp DESC"""
+    )
+
+    positions: list[dict[str, Any]] = []
+    total_exposure = Decimal("0")
+    total_max_profit = Decimal("0")
+    total_max_loss = Decimal("0")
+    total_expected_pnl = Decimal("0")
+
+    for row in cursor.fetchall():
+        side = str(row["side"])
+        price = Decimal(str(row["price"]))
+        size = Decimal(str(row["size"]))
+        raw_noaa = row["noaa_probability"]
+        noaa_prob = (
+            Decimal(str(raw_noaa))
+            if raw_noaa is not None
+            else Decimal("0.5")
+        )
+        edge = Decimal(str(row["edge"]))
+
+        effective_price = price if side == "YES" else (Decimal("1") - price)
+        if effective_price > 0:
+            max_profit = size * (Decimal("1") - effective_price) / effective_price
+        else:
+            max_profit = Decimal("0")
+        max_loss = -size
+
+        # Win probability depends on trade side: YES wins when event occurs,
+        # NO wins when event does NOT occur.
+        win_prob = noaa_prob if side == "YES" else (Decimal("1") - noaa_prob)
+        expected_pnl = win_prob * max_profit + (Decimal("1") - win_prob) * max_loss
+        expected_return = expected_pnl / size if size > 0 else Decimal("0")
+
+        event_date_str = str(row["event_date_ctx"]) if row["event_date_ctx"] else ""
+        days_until: int | None = None
+        if event_date_str:
+            try:
+                event_dt = date.fromisoformat(event_date_str)
+                days_until = (event_dt - today).days
+            except ValueError:
+                pass
+
+        positions.append({
+            "trade_id": str(row["trade_id"]),
+            "market_id": str(row["market_id"]),
+            "question": str(row["question"]) if row["question"] else "",
+            "location": str(row["location"]) if row["location"] else "",
+            "side": side,
+            "entry_price": price,
+            "size": size,
+            "noaa_probability": noaa_prob,
+            "edge": edge,
+            "max_profit": max_profit.quantize(Decimal("0.01")),
+            "max_loss": max_loss.quantize(Decimal("0.01")),
+            "expected_pnl": expected_pnl.quantize(Decimal("0.01")),
+            "expected_return": expected_return.quantize(Decimal("0.0001")),
+            "event_date": event_date_str,
+            "days_until_event": days_until,
+            "metric": str(row["metric"]) if row["metric"] else "",
+            "threshold": float(row["threshold"]) if row["threshold"] else 0.0,
+            "comparison": str(row["comparison"]) if row["comparison"] else "",
+            "timestamp": str(row["timestamp"]),
+        })
+
+        total_exposure += size
+        total_max_profit += max_profit
+        total_max_loss += max_loss
+        total_expected_pnl += expected_pnl
+
+    total_expected_return = (
+        total_expected_pnl / total_exposure
+        if total_exposure > 0
+        else Decimal("0")
+    )
+
+    return {
+        "positions": positions,
+        "summary": {
+            "position_count": len(positions),
+            "total_exposure": total_exposure.quantize(Decimal("0.01")),
+            "total_max_profit": total_max_profit.quantize(Decimal("0.01")),
+            "total_max_loss": total_max_loss.quantize(Decimal("0.01")),
+            "total_expected_pnl": total_expected_pnl.quantize(Decimal("0.01")),
+            "total_expected_return": total_expected_return.quantize(Decimal("0.0001")),
+        },
+    }
+
+
 def get_report_data(conn: sqlite3.Connection, days: int = 30) -> dict[str, Any]:
     """Get summary report data for the last N days.
 
