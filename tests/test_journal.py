@@ -48,7 +48,7 @@ class TestEnsureColumns:
     def test_columns_added_on_init(self) -> None:
         """Context columns exist after journal init."""
         j = _make_journal()
-        cursor = j._conn.cursor()
+        cursor = j.connection.cursor()
         cursor.execute("PRAGMA table_info(trades)")
         col_names = {row[1] for row in cursor.fetchall()}
         j.close()
@@ -66,9 +66,11 @@ class TestEnsureColumns:
         assert "noaa_forecast_narrative" in col_names
 
     def test_ensure_columns_is_idempotent(self) -> None:
-        """Running _ensure_context_columns twice does not raise."""
+        """Running schema initialization twice does not raise."""
+        from src.schema import ensure_context_columns
+
         j = _make_journal()
-        j._ensure_context_columns()  # second call — should not error
+        ensure_context_columns(j.connection)  # second call — should not error
         j.close()
 
 
@@ -90,7 +92,7 @@ class TestLogTradeWithContext:
         ok = j.log_trade(trade, market_context=context)
         assert ok is True
 
-        cursor = j._conn.cursor()
+        cursor = j.connection.cursor()
         cursor.execute("SELECT * FROM trades WHERE trade_id = ?", ("t001",))
         row = cursor.fetchone()
         j.close()
@@ -109,7 +111,7 @@ class TestLogTradeWithContext:
         ok = j.log_trade(trade)
         assert ok is True
 
-        cursor = j._conn.cursor()
+        cursor = j.connection.cursor()
         cursor.execute("SELECT * FROM trades WHERE trade_id = ?", ("t001",))
         row = cursor.fetchone()
         j.close()
@@ -144,7 +146,7 @@ class TestBackfillTradeContext:
         # Run backfill
         j.backfill_trade_context()
 
-        cursor = j._conn.cursor()
+        cursor = j.connection.cursor()
         cursor.execute("SELECT * FROM trades WHERE trade_id = ?", ("t001",))
         row = cursor.fetchone()
         j.close()
@@ -181,7 +183,7 @@ class TestBackfillTradeContext:
 
         j.backfill_trade_context()
 
-        cursor = j._conn.cursor()
+        cursor = j.connection.cursor()
         cursor.execute("SELECT * FROM trades WHERE trade_id = ?", ("t001",))
         row = cursor.fetchone()
         j.close()

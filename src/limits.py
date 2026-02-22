@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 def check_position_limit(
     trade_size: Decimal,
     bankroll: Decimal,
-    cap_pct: Decimal = Decimal("0.05"),
+    cap_pct: Decimal = Decimal("0.25"),
 ) -> tuple[bool, str]:
     """Check that a single position does not exceed the per-position cap.
 

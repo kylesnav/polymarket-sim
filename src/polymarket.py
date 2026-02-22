@@ -39,14 +39,17 @@ WEATHER_KEYWORDS: list[str] = [
 
 # Common US city coordinates for market question parsing
 CITY_COORDS: dict[str, tuple[float, float]] = {
+    # Top 50 US cities by population + weather-volatile cities
     "new york": (40.7128, -74.0060),
     "nyc": (40.7128, -74.0060),
     "los angeles": (34.0522, -118.2437),
     "la": (34.0522, -118.2437),
     "chicago": (41.8781, -87.6298),
+    "chi": (41.8781, -87.6298),
     "houston": (29.7604, -95.3698),
     "phoenix": (33.4484, -112.0740),
     "philadelphia": (39.9526, -75.1652),
+    "philly": (39.9526, -75.1652),
     "san antonio": (29.4241, -98.4936),
     "san diego": (32.7157, -117.1611),
     "dallas": (32.7767, -96.7970),
@@ -59,15 +62,73 @@ CITY_COORDS: dict[str, tuple[float, float]] = {
     "dc": (38.9072, -77.0369),
     "san francisco": (37.7749, -122.4194),
     "sf": (37.7749, -122.4194),
+    "san fran": (37.7749, -122.4194),
     "nashville": (36.1627, -86.7816),
     "detroit": (42.3314, -83.0458),
     "minneapolis": (44.9778, -93.2650),
     "portland": (45.5152, -122.6784),
     "las vegas": (36.1699, -115.1398),
+    "vegas": (36.1699, -115.1398),
     "baltimore": (39.2904, -76.6122),
     "milwaukee": (43.0389, -87.9065),
     "st. louis": (38.6270, -90.1994),
     "st louis": (38.6270, -90.1994),
+    # Additional major cities
+    "austin": (30.2672, -97.7431),
+    "jacksonville": (30.3322, -81.6557),
+    "fort worth": (32.7555, -97.3308),
+    "columbus": (39.9612, -82.9988),
+    "charlotte": (35.2271, -80.8431),
+    "indianapolis": (39.7684, -86.1581),
+    "indy": (39.7684, -86.1581),
+    "san jose": (37.3382, -121.8863),
+    "memphis": (35.1495, -90.0490),
+    "oklahoma city": (35.4676, -97.5164),
+    "okc": (35.4676, -97.5164),
+    "louisville": (38.2527, -85.7585),
+    "tucson": (32.2226, -110.9747),
+    "el paso": (31.7619, -106.4850),
+    "raleigh": (35.7796, -78.6382),
+    "new orleans": (29.9511, -90.0715),
+    "nola": (29.9511, -90.0715),
+    "tampa": (27.9506, -82.4572),
+    "orlando": (28.5384, -81.3789),
+    "kansas city": (39.0997, -94.5786),
+    "kc": (39.0997, -94.5786),
+    "sacramento": (38.5816, -121.4944),
+    "pittsburgh": (40.4406, -79.9959),
+    "cincinnati": (39.1031, -84.5120),
+    "cleveland": (41.4993, -81.6944),
+    "omaha": (41.2565, -95.9345),
+    "tulsa": (36.1540, -95.9928),
+    "albuquerque": (35.0844, -106.6504),
+    "honolulu": (21.3069, -157.8583),
+    "anchorage": (61.2181, -149.9003),
+    # Weather-volatile cities
+    "buffalo": (42.8864, -78.8784),
+    "rochester": (43.1566, -77.6088),
+    "syracuse": (43.0481, -76.1474),
+    "des moines": (41.5868, -93.6250),
+    "wichita": (37.6872, -97.3301),
+    "boise": (43.6150, -116.2023),
+    "salt lake city": (40.7608, -111.8910),
+    "slc": (40.7608, -111.8910),
+    "spokane": (47.6588, -117.4260),
+    "fargo": (46.8772, -96.7898),
+    "sioux falls": (43.5446, -96.7311),
+    "billings": (45.7833, -108.5007),
+    "reno": (39.5296, -119.8138),
+    "colorado springs": (38.8339, -104.8214),
+    "little rock": (34.7465, -92.2896),
+    "jackson": (32.2988, -90.1848),
+    "birmingham": (33.5207, -86.8025),
+    "richmond": (37.5407, -77.4360),
+    "norfolk": (36.8508, -76.2859),
+    "charleston": (32.7765, -79.9311),
+    "savannah": (32.0809, -81.0912),
+    "hartford": (41.7658, -72.6734),
+    "providence": (41.8240, -71.4128),
+    "knoxville": (35.9606, -83.9207),
 }
 
 MONTHS: dict[str, int] = {
@@ -101,9 +162,12 @@ def _retry_with_backoff(
     Raises:
         RuntimeError: If all retries fail without raising an exception.
     """
+    from src.ratelimit import polymarket_limiter
+
     last_exception: Exception | None = None
     for attempt in range(max_retries):
         try:
+            polymarket_limiter.acquire()
             result: Any = func()
             return result
         except Exception as e:  # noqa: BLE001
@@ -399,6 +463,12 @@ class PolymarketClient:
         if close_date is None:
             return None
 
+        # Parse market creation time for freshness scoring
+        created_at_str: str = str(
+            data.get("createdAt", data.get("created_at", ""))
+        )
+        created_at = _parse_datetime(created_at_str)
+
         # Gamma uses "clobTokenIds" (JSON string), CLOB uses "tokens" array
         token_id = ""
         clob_token_ids: Any = data.get("clobTokenIds")
@@ -431,6 +501,7 @@ class PolymarketClient:
             volume=volume,
             close_date=close_date,
             token_id=token_id,
+            created_at=created_at,
         )
 
 
