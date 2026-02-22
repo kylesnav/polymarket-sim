@@ -30,6 +30,7 @@ class WeatherMarket(BaseModel, frozen=True):
     volume: Decimal
     close_date: datetime
     token_id: str = ""
+    created_at: datetime | None = None
 
 
 class NOAAForecast(BaseModel, frozen=True):
@@ -42,6 +43,7 @@ class NOAAForecast(BaseModel, frozen=True):
     temperature_low: float | None = None
     precip_probability: float | None = None
     forecast_narrative: str = ""
+    update_time: datetime | None = None
 
 
 class NOAAObservation(BaseModel, frozen=True):
@@ -56,6 +58,21 @@ class NOAAObservation(BaseModel, frozen=True):
     precipitation: float | None = None  # inches
 
 
+class NBMPercentiles(BaseModel, frozen=True):
+    """NBM probabilistic temperature percentiles for a station."""
+
+    station_id: str
+    forecast_date: date
+    retrieved_at: datetime
+    p10: float | None = None
+    p25: float | None = None
+    p50: float | None = None
+    p75: float | None = None
+    p90: float | None = None
+    std_dev: float | None = None
+    metric: Literal["temperature_high", "temperature_low"]
+
+
 class Signal(BaseModel, frozen=True):
     """Trading signal from NOAA-vs-market comparison."""
 
@@ -67,6 +84,7 @@ class Signal(BaseModel, frozen=True):
     kelly_fraction: Decimal
     recommended_size: Decimal
     confidence: Literal["high", "medium", "low"]
+    forecast_horizon_days: int = 0
 
 
 class Trade(BaseModel, frozen=True):

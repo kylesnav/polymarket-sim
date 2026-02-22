@@ -21,11 +21,20 @@ class Settings(BaseSettings):
 
     # Trading config
     max_bankroll: float = 500.0
-    position_cap_pct: float = 0.05
+    position_cap_pct: float = 0.25
     kelly_fraction: float = 0.25
     daily_loss_limit_pct: float = 0.05
     min_edge_threshold: float = 0.10
     kill_switch: bool = False
+
+    # Market filtering
+    min_volume: float = 1000.0
+    max_spread: float = 0.05
+    max_forecast_horizon_days: int = 5
+    max_forecast_age_hours: float = 12.0
+
+    # Strategy rules
+    enable_extreme_value_rules: bool = True
 
     # Logging
     log_level: str = "INFO"

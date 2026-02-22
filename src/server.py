@@ -12,12 +12,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Annotated, Any
 
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from src.config import Settings
@@ -36,8 +37,8 @@ _log_counter = 0
 def _buffer_log_processor(
     _logger: Any,  # noqa: ANN401
     method_name: str,
-    event_dict: dict[str, Any],
-) -> dict[str, Any]:
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
     """Structlog processor that copies log entries to the ring buffer."""
     global _log_counter  # noqa: PLW0603
     entry = {
@@ -70,6 +71,57 @@ structlog.configure(
 
 logger = structlog.get_logger()
 
+
+# ── Dependency Injection ─────────────────────────────
+
+@lru_cache(maxsize=1)
+def _cached_settings() -> Settings:
+    """Load and cache settings from .env."""
+    env_path = Path(".env")
+    if not env_path.exists():
+        example = Path(".env.example")
+        if example.exists():
+            env_path.write_text(example.read_text())
+    return Settings()
+
+
+def _invalidate_settings_cache() -> None:
+    """Clear the settings cache so next call reloads from .env."""
+    _cached_settings.cache_clear()
+
+
+def get_settings() -> Settings:
+    """FastAPI dependency: provides Settings instance."""
+    return _cached_settings()
+
+
+def get_journal() -> Journal:
+    """FastAPI dependency: provides a Journal instance.
+
+    Yields a Journal and closes it after the request.
+    """
+    return Journal()
+
+
+def get_simulator(settings: Annotated[Settings, Depends(get_settings)]) -> Simulator:
+    """FastAPI dependency: provides a Simulator built from Settings."""
+    return Simulator(
+        bankroll=Decimal(str(settings.max_bankroll)),
+        min_edge=Decimal(str(settings.min_edge_threshold)),
+        kelly_fraction=Decimal(str(settings.kelly_fraction)),
+        position_cap_pct=Decimal(str(settings.position_cap_pct)),
+        max_bankroll=Decimal(str(settings.max_bankroll)),
+        daily_loss_limit_pct=Decimal(str(settings.daily_loss_limit_pct)),
+        kill_switch=settings.kill_switch,
+        min_volume=Decimal(str(settings.min_volume)),
+        max_spread=Decimal(str(settings.max_spread)),
+        max_forecast_horizon_days=settings.max_forecast_horizon_days,
+        max_forecast_age_hours=settings.max_forecast_age_hours,
+    )
+
+
+# ── Lifespan ─────────────────────────────────────────
+
 @asynccontextmanager
 async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Run trade context backfill once at server startup."""
@@ -83,6 +135,22 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Weather Edge Tracker", lifespan=_lifespan)
 
+
+# ── Global Exception Handler ────────────────────────
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(  # pyright: ignore[reportUnusedFunction]
+    _request: Request, exc: Exception
+) -> JSONResponse:
+    """Catch unhandled exceptions and return a JSON error."""
+    logger.error("unhandled_exception", error=str(exc), type=type(exc).__name__)
+    return JSONResponse(
+        status_code=500,
+        content={"error": str(exc), "type": type(exc).__name__},
+    )
+
+
+# ── JSON Encoding ───────────────────────────────────
 
 class _Encoder(json.JSONEncoder):
     """JSON encoder that handles Decimal, date, and datetime."""
@@ -101,29 +169,6 @@ def _json(data: Any) -> JSONResponse:  # noqa: ANN401
     """Serialize data to JSONResponse with Decimal/date support."""
     content: Any = json.loads(json.dumps(data, cls=_Encoder))
     return JSONResponse(content=content)
-
-
-def _load_settings() -> Settings:
-    """Load settings from .env, creating file with defaults if needed."""
-    env_path = Path(".env")
-    if not env_path.exists():
-        example = Path(".env.example")
-        if example.exists():
-            env_path.write_text(example.read_text())
-    return Settings()
-
-
-def _make_simulator(settings: Settings) -> Simulator:
-    """Create a Simulator from current settings."""
-    return Simulator(
-        bankroll=Decimal(str(settings.max_bankroll)),
-        min_edge=Decimal(str(settings.min_edge_threshold)),
-        kelly_fraction=Decimal(str(settings.kelly_fraction)),
-        position_cap_pct=Decimal(str(settings.position_cap_pct)),
-        max_bankroll=Decimal(str(settings.max_bankroll)),
-        daily_loss_limit_pct=Decimal(str(settings.daily_loss_limit_pct)),
-        kill_switch=settings.kill_switch,
-    )
 
 
 def _enrich_signals(
@@ -166,10 +211,11 @@ def index() -> FileResponse:
 # ── Status & Config ─────────────────────────────────
 
 @app.get("/api/status")
-def get_status() -> JSONResponse:
+def get_status(
+    settings: Annotated[Settings, Depends(get_settings)],
+    journal: Annotated[Journal, Depends(get_journal)],
+) -> JSONResponse:
     """Return current config + lifecycle counts."""
-    settings = _load_settings()
-    journal = Journal()
     try:
         lifecycle = journal.get_lifecycle_counts()
         return _json({
@@ -225,7 +271,29 @@ async def update_settings(request: Request) -> JSONResponse:
                 lines.append(f"{env_key}={value}")
 
     env_path.write_text("\n".join(lines) + "\n")
-    return get_status()
+    _invalidate_settings_cache()
+
+    # Re-fetch status with fresh settings
+    settings = get_settings()
+    journal = Journal()
+    try:
+        lifecycle = journal.get_lifecycle_counts()
+        return _json({
+            "max_bankroll": settings.max_bankroll,
+            "position_cap_pct": settings.position_cap_pct,
+            "kelly_fraction": settings.kelly_fraction,
+            "min_edge_threshold": settings.min_edge_threshold,
+            "daily_loss_limit_pct": settings.daily_loss_limit_pct,
+            "kill_switch": settings.kill_switch,
+            "log_level": settings.log_level,
+            "unresolved_trades": lifecycle["open"] + lifecycle["ready"],
+            "open_bets": lifecycle["open"],
+            "ready_to_resolve": lifecycle["ready"],
+            "resolved_count": lifecycle["resolved"],
+            "total_trades": lifecycle["total"],
+        })
+    finally:
+        journal.close()
 
 
 @app.put("/api/kill-switch")
@@ -249,16 +317,37 @@ async def toggle_kill_switch(request: Request) -> JSONResponse:
         lines.append(f"KILL_SWITCH={value}")
 
     env_path.write_text("\n".join(lines) + "\n")
-    return get_status()
+    _invalidate_settings_cache()
+
+    settings = get_settings()
+    journal = Journal()
+    try:
+        lifecycle = journal.get_lifecycle_counts()
+        return _json({
+            "max_bankroll": settings.max_bankroll,
+            "position_cap_pct": settings.position_cap_pct,
+            "kelly_fraction": settings.kelly_fraction,
+            "min_edge_threshold": settings.min_edge_threshold,
+            "daily_loss_limit_pct": settings.daily_loss_limit_pct,
+            "kill_switch": settings.kill_switch,
+            "log_level": settings.log_level,
+            "unresolved_trades": lifecycle["open"] + lifecycle["ready"],
+            "open_bets": lifecycle["open"],
+            "ready_to_resolve": lifecycle["ready"],
+            "resolved_count": lifecycle["resolved"],
+            "total_trades": lifecycle["total"],
+        })
+    finally:
+        journal.close()
 
 
 # ── Actions (CLI parity) ───────────────────────────
 
 @app.post("/api/scan")
-def run_scan() -> JSONResponse:
+def run_scan(
+    sim: Annotated[Simulator, Depends(get_simulator)],
+) -> JSONResponse:
     """Scan for weather markets with edge. Equivalent to `cli scan`."""
-    settings = _load_settings()
-    sim = _make_simulator(settings)
     try:
         signals = sim.run_scan()
         return _json({
@@ -273,10 +362,10 @@ def run_scan() -> JSONResponse:
 
 
 @app.post("/api/sim")
-def run_sim() -> JSONResponse:
+def run_sim(
+    sim: Annotated[Simulator, Depends(get_simulator)],
+) -> JSONResponse:
     """Run full simulation: scan + execute paper trades. Equivalent to `cli sim`."""
-    settings = _load_settings()
-    sim = _make_simulator(settings)
     try:
         signals = sim.run_scan()
         if not signals:
@@ -302,7 +391,10 @@ def run_sim() -> JSONResponse:
 
 
 @app.post("/api/sim/execute")
-async def run_sim_execute(request: Request) -> JSONResponse:
+async def run_sim_execute(
+    request: Request,
+    sim: Annotated[Simulator, Depends(get_simulator)],
+) -> JSONResponse:
     """Execute paper trades for selected market IDs only (bet slip confirm).
 
     Accepts JSON body with {"market_ids": ["id1", "id2", ...]}.
@@ -313,8 +405,6 @@ async def run_sim_execute(request: Request) -> JSONResponse:
     if not market_ids:
         return JSONResponse(status_code=400, content={"error": "No market_ids provided"})
 
-    settings = _load_settings()
-    sim = _make_simulator(settings)
     try:
         signals = sim.run_scan()
         selected = [s for s in signals if s.market_id in market_ids]
@@ -340,9 +430,10 @@ async def run_sim_execute(request: Request) -> JSONResponse:
 
 
 @app.post("/api/resolve")
-def run_resolve() -> JSONResponse:
+def run_resolve(
+    journal: Annotated[Journal, Depends(get_journal)],
+) -> JSONResponse:
     """Resolve unresolved trades against actual weather. Equivalent to `cli resolve`."""
-    journal = Journal()
     noaa = NOAAClient()
     try:
         stats = resolve_trades(journal, noaa)
@@ -358,9 +449,11 @@ def run_resolve() -> JSONResponse:
 # ── Data Queries ────────────────────────────────────
 
 @app.get("/api/report")
-def get_report(days: int = 30) -> JSONResponse:
+def get_report(
+    days: int = 30,
+    journal: Journal = Depends(get_journal),  # noqa: B008
+) -> JSONResponse:
     """Get report data. Equivalent to `cli report --days N`."""
-    journal = Journal()
     try:
         data = journal.get_report_data(days)
         return _json(data)
@@ -369,10 +462,11 @@ def get_report(days: int = 30) -> JSONResponse:
 
 
 @app.get("/api/portfolio")
-def get_portfolio() -> JSONResponse:
+def get_portfolio(
+    settings: Annotated[Settings, Depends(get_settings)],
+    journal: Annotated[Journal, Depends(get_journal)],
+) -> JSONResponse:
     """Get computed portfolio state from trade history."""
-    settings = _load_settings()
-    journal = Journal()
     try:
         summary = journal.get_portfolio_summary(Decimal(str(settings.max_bankroll)))
         return _json(summary)
@@ -381,9 +475,11 @@ def get_portfolio() -> JSONResponse:
 
 
 @app.get("/api/trades/{trade_id}")
-def get_trade_detail(trade_id: str) -> JSONResponse:
+def get_trade_detail(
+    trade_id: str,
+    journal: Annotated[Journal, Depends(get_journal)],
+) -> JSONResponse:
     """Get a single trade with full market context."""
-    journal = Journal()
     try:
         detail = journal.get_trade_detail(trade_id)
         if detail is None:
@@ -398,9 +494,9 @@ def get_trades(
     days: int = 90,
     status: str | None = None,
     outcome: str | None = None,
+    journal: Journal = Depends(get_journal),  # noqa: B008
 ) -> JSONResponse:
     """Get trade history with market context and lifecycle state."""
-    journal = Journal()
     try:
         trades = journal.get_trades_with_context(days, status, outcome)
         return _json({
@@ -412,9 +508,11 @@ def get_trades(
 
 
 @app.get("/api/snapshots")
-def get_snapshots(days: int = 60) -> JSONResponse:
+def get_snapshots(
+    days: int = 60,
+    journal: Journal = Depends(get_journal),  # noqa: B008
+) -> JSONResponse:
     """Get daily portfolio snapshots for charting."""
-    journal = Journal()
     try:
         snapshots = journal.get_snapshots(days)
         return _json({"snapshots": snapshots})

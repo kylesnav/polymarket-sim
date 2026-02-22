@@ -9,15 +9,26 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.server import app
+from src.server import app, get_journal, get_settings, get_simulator
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def tc() -> TestClient:
-    return TestClient(app)
+def _mock_settings() -> MagicMock:
+    s = MagicMock()
+    s.max_bankroll = 500
+    s.position_cap_pct = 0.05
+    s.kelly_fraction = 0.25
+    s.min_edge_threshold = 0.10
+    s.daily_loss_limit_pct = 0.05
+    s.kill_switch = False
+    s.log_level = "INFO"
+    s.min_volume = 1000.0
+    s.max_spread = 0.05
+    s.max_forecast_horizon_days = 5
+    s.max_forecast_age_hours = 12.0
+    return s
 
 
 def _mock_journal() -> MagicMock:
@@ -27,6 +38,26 @@ def _mock_journal() -> MagicMock:
     }
     j.close.return_value = None
     return j
+
+
+def _mock_simulator() -> MagicMock:
+    sim = MagicMock()
+    sim.run_scan.return_value = []
+    sim.last_markets = []
+    sim.close.return_value = None
+    return sim
+
+
+@pytest.fixture
+def tc() -> TestClient:
+    return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reset_overrides() -> Any:  # noqa: ANN401
+    """Clear dependency overrides after each test."""
+    yield
+    app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -49,22 +80,12 @@ class TestStaticEndpoints:
 class TestStatusEndpoint:
     """Tests for GET /api/status."""
 
-    @patch("src.server.Journal")
-    @patch("src.server._load_settings")
-    def test_returns_status(
-        self, mock_settings: MagicMock, mock_journal_cls: MagicMock, tc: TestClient,
-    ) -> None:
-        settings = MagicMock()
-        settings.max_bankroll = 500
-        settings.position_cap_pct = 0.05
-        settings.kelly_fraction = 0.25
-        settings.min_edge_threshold = 0.10
-        settings.daily_loss_limit_pct = 0.05
-        settings.kill_switch = False
-        settings.log_level = "INFO"
-        mock_settings.return_value = settings
+    def test_returns_status(self, tc: TestClient) -> None:
+        settings = _mock_settings()
+        journal = _mock_journal()
 
-        mock_journal_cls.return_value = _mock_journal()
+        app.dependency_overrides[get_settings] = lambda: settings
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/status")
         assert resp.status_code == 200
@@ -81,13 +102,12 @@ class TestStatusEndpoint:
 class TestTradesEndpoints:
     """Tests for trade-related endpoints."""
 
-    @patch("src.server.Journal")
-    def test_get_trades_returns_list(self, mock_journal_cls: MagicMock, tc: TestClient) -> None:
+    def test_get_trades_returns_list(self, tc: TestClient) -> None:
         journal = _mock_journal()
         journal.get_trades_with_context.return_value = [
             {"trade_id": "t1", "market_id": "m1", "status": "filled"},
         ]
-        mock_journal_cls.return_value = journal
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/trades")
         assert resp.status_code == 200
@@ -95,37 +115,32 @@ class TestTradesEndpoints:
         assert data["count"] == 1
         assert data["trades"][0]["trade_id"] == "t1"
 
-    @patch("src.server.Journal")
-    def test_get_trades_with_status_filter(
-        self, mock_journal_cls: MagicMock, tc: TestClient,
-    ) -> None:
+    def test_get_trades_with_status_filter(self, tc: TestClient) -> None:
         journal = _mock_journal()
         journal.get_trades_with_context.return_value = []
-        mock_journal_cls.return_value = journal
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/trades?status=resolved&outcome=won")
         assert resp.status_code == 200
         journal.get_trades_with_context.assert_called_once_with(90, "resolved", "won")
 
-    @patch("src.server.Journal")
-    def test_get_trade_detail_found(self, mock_journal_cls: MagicMock, tc: TestClient) -> None:
+    def test_get_trade_detail_found(self, tc: TestClient) -> None:
         journal = _mock_journal()
         journal.get_trade_detail.return_value = {
             "trade_id": "abc123",
             "market_id": "m1",
             "status": "filled",
         }
-        mock_journal_cls.return_value = journal
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/trades/abc123")
         assert resp.status_code == 200
         assert resp.json()["trade_id"] == "abc123"
 
-    @patch("src.server.Journal")
-    def test_get_trade_detail_not_found(self, mock_journal_cls: MagicMock, tc: TestClient) -> None:
+    def test_get_trade_detail_not_found(self, tc: TestClient) -> None:
         journal = _mock_journal()
         journal.get_trade_detail.return_value = None
-        mock_journal_cls.return_value = journal
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/trades/nonexistent")
         assert resp.status_code == 404
@@ -138,22 +153,17 @@ class TestTradesEndpoints:
 class TestPortfolioEndpoint:
     """Tests for GET /api/portfolio."""
 
-    @patch("src.server.Journal")
-    @patch("src.server._load_settings")
-    def test_returns_portfolio_summary(
-        self, mock_settings: MagicMock, mock_journal_cls: MagicMock, tc: TestClient,
-    ) -> None:
-        settings = MagicMock()
-        settings.max_bankroll = 500
-        mock_settings.return_value = settings
-
+    def test_returns_portfolio_summary(self, tc: TestClient) -> None:
+        settings = _mock_settings()
         journal = _mock_journal()
         journal.get_portfolio_summary.return_value = {
             "cash": Decimal("450"),
             "exposure": Decimal("50"),
             "total_value": Decimal("500"),
         }
-        mock_journal_cls.return_value = journal
+
+        app.dependency_overrides[get_settings] = lambda: settings
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/portfolio")
         assert resp.status_code == 200
@@ -168,8 +178,7 @@ class TestPortfolioEndpoint:
 class TestReportEndpoint:
     """Tests for GET /api/report."""
 
-    @patch("src.server.Journal")
-    def test_returns_report_data(self, mock_journal_cls: MagicMock, tc: TestClient) -> None:
+    def test_returns_report_data(self, tc: TestClient) -> None:
         journal = _mock_journal()
         journal.get_report_data.return_value = {
             "days": 30,
@@ -177,7 +186,7 @@ class TestReportEndpoint:
             "wins": 6,
             "losses": 4,
         }
-        mock_journal_cls.return_value = journal
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/report?days=30")
         assert resp.status_code == 200
@@ -192,13 +201,12 @@ class TestReportEndpoint:
 class TestSnapshotsEndpoint:
     """Tests for GET /api/snapshots."""
 
-    @patch("src.server.Journal")
-    def test_returns_snapshots(self, mock_journal_cls: MagicMock, tc: TestClient) -> None:
+    def test_returns_snapshots(self, tc: TestClient) -> None:
         journal = _mock_journal()
         journal.get_snapshots.return_value = [
             {"snapshot_date": "2027-03-01", "total_value": "500"},
         ]
-        mock_journal_cls.return_value = journal
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/snapshots?days=30")
         assert resp.status_code == 200
@@ -234,33 +242,19 @@ class TestLogsEndpoint:
 class TestScanEndpoint:
     """Tests for POST /api/scan."""
 
-    @patch("src.server._make_simulator")
-    @patch("src.server._load_settings")
-    def test_scan_returns_signals(
-        self, mock_settings: MagicMock, mock_sim: MagicMock, tc: TestClient,
-    ) -> None:
-        settings = MagicMock()
-        mock_settings.return_value = settings
-
-        sim = MagicMock()
-        sim.run_scan.return_value = []
-        sim.last_markets = []
-        mock_sim.return_value = sim
+    def test_scan_returns_signals(self, tc: TestClient) -> None:
+        sim = _mock_simulator()
+        app.dependency_overrides[get_simulator] = lambda: sim
 
         resp = tc.post("/api/scan")
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] == 0
 
-    @patch("src.server._make_simulator")
-    @patch("src.server._load_settings")
-    def test_scan_error_returns_500(
-        self, mock_settings: MagicMock, mock_sim: MagicMock, tc: TestClient,
-    ) -> None:
-        mock_settings.return_value = MagicMock()
-        sim = MagicMock()
+    def test_scan_error_returns_500(self, tc: TestClient) -> None:
+        sim = _mock_simulator()
         sim.run_scan.side_effect = RuntimeError("API failed")
-        mock_sim.return_value = sim
+        app.dependency_overrides[get_simulator] = lambda: sim
 
         resp = tc.post("/api/scan")
         assert resp.status_code == 500
@@ -274,15 +268,9 @@ class TestScanEndpoint:
 class TestSimEndpoint:
     """Tests for POST /api/sim."""
 
-    @patch("src.server._make_simulator")
-    @patch("src.server._load_settings")
-    def test_sim_no_signals(
-        self, mock_settings: MagicMock, mock_sim: MagicMock, tc: TestClient,
-    ) -> None:
-        mock_settings.return_value = MagicMock()
-        sim = MagicMock()
-        sim.run_scan.return_value = []
-        mock_sim.return_value = sim
+    def test_sim_no_signals(self, tc: TestClient) -> None:
+        sim = _mock_simulator()
+        app.dependency_overrides[get_simulator] = lambda: sim
 
         resp = tc.post("/api/sim")
         assert resp.status_code == 200
@@ -297,24 +285,16 @@ class TestSimEndpoint:
 class TestSimExecuteEndpoint:
     """Tests for POST /api/sim/execute."""
 
-    @patch("src.server._make_simulator")
-    @patch("src.server._load_settings")
-    def test_execute_no_market_ids_returns_400(
-        self, mock_settings: MagicMock, mock_sim: MagicMock, tc: TestClient,
-    ) -> None:
-        mock_settings.return_value = MagicMock()
+    def test_execute_no_market_ids_returns_400(self, tc: TestClient) -> None:
+        sim = _mock_simulator()
+        app.dependency_overrides[get_simulator] = lambda: sim
+
         resp = tc.post("/api/sim/execute", json={"market_ids": []})
         assert resp.status_code == 400
 
-    @patch("src.server._make_simulator")
-    @patch("src.server._load_settings")
-    def test_execute_no_matching_signals(
-        self, mock_settings: MagicMock, mock_sim: MagicMock, tc: TestClient,
-    ) -> None:
-        mock_settings.return_value = MagicMock()
-        sim = MagicMock()
-        sim.run_scan.return_value = []
-        mock_sim.return_value = sim
+    def test_execute_no_matching_signals(self, tc: TestClient) -> None:
+        sim = _mock_simulator()
+        app.dependency_overrides[get_simulator] = lambda: sim
 
         resp = tc.post("/api/sim/execute", json={"market_ids": ["mkt-1"]})
         assert resp.status_code == 200
@@ -329,15 +309,9 @@ class TestSimExecuteEndpoint:
 class TestResolveEndpoint:
     """Tests for POST /api/resolve."""
 
-    @patch("src.server.NOAAClient")
-    @patch("src.server.Journal")
-    def test_resolve_returns_stats(
-        self, mock_journal_cls: MagicMock, mock_noaa_cls: MagicMock, tc: TestClient,
-    ) -> None:
+    def test_resolve_returns_stats(self, tc: TestClient) -> None:
         journal = _mock_journal()
-        noaa = MagicMock()
-        mock_journal_cls.return_value = journal
-        mock_noaa_cls.return_value = noaa
+        app.dependency_overrides[get_journal] = lambda: journal
 
         with patch("src.server.resolve_trades") as mock_resolve:
             mock_resolve.return_value = {
@@ -354,33 +328,15 @@ class TestResolveEndpoint:
 
 
 # ---------------------------------------------------------------------------
-# Backtest
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------
 
 class TestSettingsEndpoint:
     """Tests for PUT /api/settings."""
 
-    @patch("src.server.Journal")
-    @patch("src.server._load_settings")
-    def test_update_settings(
-        self, mock_settings: MagicMock, mock_journal_cls: MagicMock, tc: TestClient, tmp_path: Any,
-    ) -> None:
-        # This test exercises the endpoint but relies on writing .env
-        # We patch to avoid side effects
-        settings = MagicMock()
-        settings.max_bankroll = 500
-        settings.position_cap_pct = 0.05
-        settings.kelly_fraction = 0.25
-        settings.min_edge_threshold = 0.10
-        settings.daily_loss_limit_pct = 0.05
-        settings.kill_switch = False
-        settings.log_level = "INFO"
-        mock_settings.return_value = settings
-        mock_journal_cls.return_value = _mock_journal()
+    def test_update_settings(self, tc: TestClient) -> None:
+        journal = _mock_journal()
+        app.dependency_overrides[get_journal] = lambda: journal
 
         with patch("src.server.Path") as mock_path_cls:
             mock_path = MagicMock()
@@ -400,21 +356,9 @@ class TestSettingsEndpoint:
 class TestKillSwitchEndpoint:
     """Tests for PUT /api/kill-switch."""
 
-    @patch("src.server.Journal")
-    @patch("src.server._load_settings")
-    def test_toggle_kill_switch(
-        self, mock_settings: MagicMock, mock_journal_cls: MagicMock, tc: TestClient,
-    ) -> None:
-        settings = MagicMock()
-        settings.max_bankroll = 500
-        settings.position_cap_pct = 0.05
-        settings.kelly_fraction = 0.25
-        settings.min_edge_threshold = 0.10
-        settings.daily_loss_limit_pct = 0.05
-        settings.kill_switch = True
-        settings.log_level = "INFO"
-        mock_settings.return_value = settings
-        mock_journal_cls.return_value = _mock_journal()
+    def test_toggle_kill_switch(self, tc: TestClient) -> None:
+        journal = _mock_journal()
+        app.dependency_overrides[get_journal] = lambda: journal
 
         with patch("src.server.Path") as mock_path_cls:
             mock_path = MagicMock()
@@ -434,10 +378,7 @@ class TestKillSwitchEndpoint:
 class TestJsonEncoder:
     """Tests for the custom JSON encoder used in responses."""
 
-    @patch("src.server.Journal")
-    def test_handles_decimal_in_response(
-        self, mock_journal_cls: MagicMock, tc: TestClient,
-    ) -> None:
+    def test_handles_decimal_in_response(self, tc: TestClient) -> None:
         journal = _mock_journal()
         journal.get_report_data.return_value = {
             "days": 30,
@@ -445,7 +386,7 @@ class TestJsonEncoder:
             "simulated_pnl": Decimal("12.50"),
             "actual_pnl": Decimal("0"),
         }
-        mock_journal_cls.return_value = journal
+        app.dependency_overrides[get_journal] = lambda: journal
 
         resp = tc.get("/api/report")
         assert resp.status_code == 200

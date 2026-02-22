@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.executor import SimulatedExecutor
 from src.models import NOAAForecast, Portfolio, Signal, WeatherMarket
 from src.simulator import Simulator
 
@@ -85,6 +86,11 @@ def sim() -> Simulator:
     s._max_bankroll = Decimal("500")
     s._daily_loss_limit_pct = Decimal("0.05")
     s._kill_switch = False
+    s._min_volume = Decimal("0")
+    s._max_spread = Decimal("1")
+    s._max_forecast_horizon_days = 7
+    s._max_forecast_age_hours = 12.0
+    s._executor = SimulatedExecutor()
     s._polymarket = MagicMock()
     s._noaa = MagicMock()
     s._journal = MagicMock()
@@ -111,7 +117,7 @@ class TestRunScan:
         forecast = _make_forecast(temp_high=85.0)
 
         sim._polymarket.get_weather_markets.return_value = [market]
-        sim._noaa.get_forecast.return_value = forecast
+        sim._noaa.batch_get_forecasts.return_value = {market.market_id: forecast}
 
         signals = sim.run_scan()
         # With 85°F forecast and 75°F threshold, NOAA prob should be high
@@ -133,7 +139,7 @@ class TestRunScan:
         market = _make_market()
         forecast = _make_forecast()
         sim._polymarket.get_weather_markets.return_value = [market]
-        sim._noaa.get_forecast.return_value = forecast
+        sim._noaa.batch_get_forecasts.return_value = {market.market_id: forecast}
 
         sim.run_scan()
         assert sim._last_markets == [market]

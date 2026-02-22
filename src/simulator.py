@@ -11,6 +11,8 @@ from decimal import Decimal
 
 import structlog
 
+from src.correlation import compute_correlated_exposure
+from src.executor import SimulatedExecutor, TradeExecutor
 from src.journal import Journal
 from src.limits import (
     check_bankroll_limit,
@@ -38,10 +40,14 @@ class Simulator:
         bankroll: Decimal,
         min_edge: Decimal = Decimal("0.10"),
         kelly_fraction: Decimal = Decimal("0.25"),
-        position_cap_pct: Decimal = Decimal("0.05"),
+        position_cap_pct: Decimal = Decimal("0.25"),
         max_bankroll: Decimal = Decimal("500"),
         daily_loss_limit_pct: Decimal = Decimal("0.05"),
         kill_switch: bool = False,
+        min_volume: Decimal = Decimal("1000"),
+        max_spread: Decimal = Decimal("0.05"),
+        max_forecast_horizon_days: int = 5,
+        max_forecast_age_hours: float = 12.0,
     ) -> None:
         """Initialize the simulator.
 
@@ -53,6 +59,10 @@ class Simulator:
             max_bankroll: Maximum allowed bankroll.
             daily_loss_limit_pct: Daily loss halt threshold.
             kill_switch: Whether the kill switch is engaged.
+            min_volume: Minimum market volume to consider.
+            max_spread: Maximum bid-ask spread to consider.
+            max_forecast_horizon_days: Skip markets beyond this horizon.
+            max_forecast_age_hours: Skip forecasts older than this.
         """
         self._bankroll = bankroll
         self._min_edge = min_edge
@@ -61,10 +71,15 @@ class Simulator:
         self._max_bankroll = max_bankroll
         self._daily_loss_limit_pct = daily_loss_limit_pct
         self._kill_switch = kill_switch
+        self._min_volume = min_volume
+        self._max_spread = max_spread
+        self._max_forecast_horizon_days = max_forecast_horizon_days
+        self._max_forecast_age_hours = max_forecast_age_hours
 
         self._polymarket = PolymarketClient()
         self._noaa = NOAAClient()
         self._journal = Journal()
+        self._executor: TradeExecutor = SimulatedExecutor()
 
         # Restore portfolio state from journal (accounts for existing trades)
         summary = self._journal.get_portfolio_summary(bankroll)
@@ -171,6 +186,10 @@ class Simulator:
             daily_loss_limit_pct=self._daily_loss_limit_pct,
             kill_switch=self._kill_switch,
             portfolio=self._portfolio,
+            min_volume=self._min_volume,
+            max_spread=self._max_spread,
+            max_forecast_horizon_days=self._max_forecast_horizon_days,
+            max_forecast_age_hours=self._max_forecast_age_hours,
         )
 
         logger.info("signals_generated", count=len(signals))
@@ -197,27 +216,30 @@ class Simulator:
             market_lookup[market.market_id] = market
 
         for signal in signals:
-            # Check existing exposure and cap to remaining room under position limit
+            # Check existing exposure including correlated positions
             max_position = self._max_bankroll * self._position_cap_pct
-            existing_size = self._journal.get_open_position_size(signal.market_id)
-            remaining_room = max_position - existing_size
+            correlated_exposure = compute_correlated_exposure(
+                signal, self._last_markets, self._journal.get_open_position_size,
+            )
+            remaining_room = max_position - correlated_exposure
 
             if remaining_room <= Decimal("0"):
                 logger.info(
                     "skipping_position_full",
                     market_id=signal.market_id,
-                    existing=str(existing_size),
+                    correlated_exposure=str(correlated_exposure),
                     cap=str(max_position),
                 )
                 self._last_skip_reasons.append({
                     "market_id": signal.market_id,
                     "reason": (
-                        f"Position full: ${existing_size} deployed, "
-                        f"cap is ${max_position}"
+                        f"Position full: ${correlated_exposure} deployed "
+                        f"(incl. correlated), cap is ${max_position}"
                     ),
                 })
                 continue
 
+            existing_size = self._journal.get_open_position_size(signal.market_id)
             is_double_down = existing_size > Decimal("0")
 
             # Pre-execution limit checks
@@ -272,7 +294,7 @@ class Simulator:
                 })
                 continue
 
-            # Create trade record
+            # Create pending trade record for log-before-execute
             trade = Trade(
                 market_id=signal.market_id,
                 side=signal.side,
@@ -327,30 +349,50 @@ class Simulator:
                     comparison=market.comparison,
                 )
 
-            # Simulate the fill
-            self._journal.update_trade_status(trade.trade_id, "filled")
-            filled_trade = Trade(
-                trade_id=trade.trade_id,
-                market_id=trade.market_id,
-                side=trade.side,
-                price=trade.price,
-                size=trade.size,
-                noaa_probability=trade.noaa_probability,
-                edge=trade.edge,
-                timestamp=trade.timestamp,
-                status="filled",
-            )
-            trades.append(filled_trade)
+            # Execute via executor (simulated or live), with rollback on failure
+            try:
+                executor_result = self._executor.execute(signal, trade_size)
+                if executor_result is None:
+                    logger.error("executor_fill_failed", trade_id=trade.trade_id)
+                    self._journal.update_trade_status(trade.trade_id, "cancelled")
+                    continue
 
-            # Update portfolio: subtract cash spent, total_value stays same (cash→exposure)
-            new_cash = self._portfolio.cash - trade_size
-            self._portfolio = Portfolio(
-                cash=new_cash,
-                total_value=self._portfolio.total_value,
-                starting_bankroll=self._portfolio.starting_bankroll,
-            )
-            # Keep bankroll in sync with cash for accurate Kelly sizing
-            self._bankroll = new_cash
+                # Update journal with the fill — use the pending trade_id for continuity
+                self._journal.update_trade_status(trade.trade_id, "filled")
+                filled_trade = Trade(
+                    trade_id=trade.trade_id,
+                    market_id=executor_result.market_id,
+                    side=executor_result.side,
+                    price=executor_result.price,
+                    size=executor_result.size,
+                    noaa_probability=executor_result.noaa_probability,
+                    edge=executor_result.edge,
+                    timestamp=executor_result.timestamp,
+                    status="filled",
+                )
+                trades.append(filled_trade)
+
+                # Update portfolio: subtract cash spent, total_value stays same (cash→exposure)
+                new_cash = self._portfolio.cash - trade_size
+                self._portfolio = Portfolio(
+                    cash=new_cash,
+                    total_value=self._portfolio.total_value,
+                    starting_bankroll=self._portfolio.starting_bankroll,
+                )
+                # Keep bankroll in sync with cash for accurate Kelly sizing
+                self._bankroll = new_cash
+            except Exception as e:
+                logger.error(
+                    "trade_execution_failed",
+                    trade_id=trade.trade_id,
+                    error=str(e),
+                )
+                self._journal.update_trade_status(trade.trade_id, "cancelled")
+                self._last_skip_reasons.append({
+                    "market_id": signal.market_id,
+                    "reason": f"Execution failed: {e}",
+                })
+                continue
 
             logger.info(
                 "paper_trade_executed",
@@ -386,7 +428,7 @@ class Simulator:
     def _fetch_forecasts(
         self, markets: list[WeatherMarket]
     ) -> dict[str, NOAAForecast]:
-        """Fetch NOAA forecasts for a list of markets.
+        """Fetch NOAA forecasts for a list of markets using parallel fetching.
 
         Args:
             markets: Weather markets to fetch forecasts for.
@@ -394,29 +436,13 @@ class Simulator:
         Returns:
             Dict mapping market_id to NOAAForecast.
         """
-        forecasts: dict[str, NOAAForecast] = {}
+        if not markets:
+            return {}
 
-        for market in markets:
-            forecast = self._noaa.get_forecast(
-                lat=market.lat,
-                lon=market.lon,
-                target_date=market.event_date,
-            )
-            if forecast is not None:
-                forecasts[market.market_id] = forecast
-                logger.debug(
-                    "forecast_fetched",
-                    market_id=market.market_id,
-                    location=market.location,
-                )
-            else:
-                logger.warning(
-                    "forecast_unavailable",
-                    market_id=market.market_id,
-                    location=market.location,
-                )
-
-        return forecasts
+        requests = [
+            (m.market_id, m.lat, m.lon, m.event_date) for m in markets
+        ]
+        return self._noaa.batch_get_forecasts(requests, max_workers=10)
 
     @property
     def last_markets(self) -> list[WeatherMarket]:

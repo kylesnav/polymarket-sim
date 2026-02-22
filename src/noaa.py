@@ -7,6 +7,7 @@ Two-step flow: /points/{lat},{lon} → grid metadata → /gridpoints/{office}/{x
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -14,6 +15,7 @@ import httpx
 import structlog
 
 from src.models import NOAAForecast, NOAAObservation
+from src.ratelimit import noaa_limiter
 
 logger = structlog.get_logger()
 
@@ -90,6 +92,60 @@ class NOAAClient:
             return None
 
         return self._parse_observations(observation_data, station_id, lat, lon, target_date)
+
+    def batch_get_forecasts(
+        self,
+        requests: list[tuple[str, float, float, date]],
+        max_workers: int = 10,
+    ) -> dict[str, NOAAForecast]:
+        """Fetch NOAA forecasts for multiple markets in parallel.
+
+        Args:
+            requests: List of (market_id, lat, lon, target_date) tuples.
+            max_workers: Maximum concurrent threads (capped at 10).
+
+        Returns:
+            Dict mapping market_id to NOAAForecast for successful fetches.
+        """
+        workers = min(max_workers, 10, len(requests))
+        if workers <= 0:
+            return {}
+
+        forecasts: dict[str, NOAAForecast] = {}
+
+        def _fetch_one(
+            market_id: str, lat: float, lon: float, target_date: date
+        ) -> tuple[str, NOAAForecast | None]:
+            forecast = self.get_forecast(lat, lon, target_date)
+            return market_id, forecast
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(_fetch_one, mid, lat, lon, td): mid
+                for mid, lat, lon, td in requests
+            }
+            for future in as_completed(futures):
+                market_id = futures[future]
+                try:
+                    _, forecast = future.result()
+                    if forecast is not None:
+                        forecasts[market_id] = forecast
+                        logger.debug("forecast_fetched", market_id=market_id)
+                    else:
+                        logger.warning("forecast_unavailable", market_id=market_id)
+                except Exception as e:
+                    logger.error(
+                        "batch_forecast_error",
+                        market_id=market_id,
+                        error=str(e),
+                    )
+
+        logger.info(
+            "batch_forecasts_complete",
+            requested=len(requests),
+            fetched=len(forecasts),
+        )
+        return forecasts
 
     def _get_nearest_station(self, lat: float, lon: float) -> str | None:
         """Get the nearest weather station ID for a lat/lon.
@@ -338,6 +394,17 @@ class NOAAClient:
         if not isinstance(props, dict):
             return None
 
+        # Parse forecast update time for freshness checks
+        update_time: datetime | None = None
+        update_time_str: str = str(props.get("updateTime", ""))
+        if update_time_str:
+            try:
+                update_time = datetime.fromisoformat(update_time_str)
+                if update_time.tzinfo is None:
+                    update_time = update_time.replace(tzinfo=UTC)
+            except ValueError:
+                pass
+
         periods: list[dict[str, Any]] = props.get("periods", [])
         if not isinstance(periods, list):
             return None
@@ -399,6 +466,7 @@ class NOAAClient:
             temperature_low=temp_low,
             precip_probability=precip_prob,
             forecast_narrative=narrative,
+            update_time=update_time,
         )
 
     def _request_with_retry(
@@ -419,6 +487,7 @@ class NOAAClient:
         """
         for attempt in range(max_retries):
             try:
+                noaa_limiter.acquire()
                 response = self._http.get(path)
                 response.raise_for_status()
                 result: dict[str, Any] = response.json()
