@@ -73,8 +73,80 @@ class NBMPercentiles(BaseModel, frozen=True):
     metric: Literal["temperature_high", "temperature_low"]
 
 
+class OutcomeBucket(BaseModel, frozen=True):
+    """A single outcome bucket within a multi-outcome weather event."""
+
+    token_id: str
+    condition_id: str
+    outcome_label: str
+    lower_bound: float | None = None  # None for "X or below" buckets
+    upper_bound: float | None = None  # None for "X or above" buckets
+    yes_price: Decimal
+    no_price: Decimal
+    volume: Decimal
+
+
+class WeatherEvent(BaseModel, frozen=True):
+    """A multi-outcome Polymarket weather event with N buckets."""
+
+    event_id: str
+    question: str
+    location: str
+    lat: float
+    lon: float
+    event_date: date
+    metric: Literal["temperature_high", "temperature_low", "precipitation", "snowfall"]
+    buckets: list[OutcomeBucket] = Field(default_factory=list)
+    close_date: datetime
+    created_at: datetime | None = None
+
+
+class OrderBookLevel(BaseModel, frozen=True):
+    """A single price level in the order book."""
+
+    price: Decimal
+    size: Decimal
+
+
+class OrderBook(BaseModel, frozen=True):
+    """L2 order book snapshot for a token."""
+
+    token_id: str
+    bids: list[OrderBookLevel] = Field(default_factory=list)  # Descending by price
+    asks: list[OrderBookLevel] = Field(default_factory=list)  # Ascending by price
+    timestamp: datetime
+
+
+class ProbabilityDistribution(BaseModel, frozen=True):
+    """NOAA-derived probability distribution across event buckets."""
+
+    event_id: str
+    bucket_probabilities: list[Decimal]
+    mean_forecast: float
+    std_dev: float
+    source: Literal["nbm", "point_forecast_normal", "fallback"]
+
+
+class BucketSignal(BaseModel, frozen=True):
+    """Trading signal for a specific bucket within a multi-outcome event."""
+
+    event_id: str
+    bucket_index: int
+    token_id: str
+    condition_id: str
+    outcome_label: str
+    noaa_probability: Decimal
+    market_price: Decimal
+    edge: Decimal
+    side: Literal["YES", "NO"]
+    kelly_fraction: Decimal
+    recommended_size: Decimal
+    confidence: Literal["high", "medium", "low"]
+    forecast_horizon_days: int = 0
+
+
 class Signal(BaseModel, frozen=True):
-    """Trading signal from NOAA-vs-market comparison."""
+    """Trading signal from NOAA-vs-market comparison (legacy binary model)."""
 
     market_id: str
     noaa_probability: Decimal
@@ -101,6 +173,13 @@ class Trade(BaseModel, frozen=True):
     status: Literal["pending", "filled", "resolved", "cancelled"] = "pending"
     outcome: Literal["won", "lost"] | None = None
     actual_pnl: Decimal | None = None
+    event_id: str = ""
+    bucket_index: int = -1
+    token_id: str = ""
+    outcome_label: str = ""
+    fill_price: Decimal | None = None
+    book_depth_at_signal: Decimal | None = None
+    resolution_source: str = ""
 
 
 class Position(BaseModel, frozen=True):

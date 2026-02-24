@@ -13,7 +13,7 @@ from typing import Any
 
 import structlog
 
-from src.models import Trade
+from src.models import Trade, WeatherEvent
 
 logger = structlog.get_logger()
 
@@ -41,8 +41,11 @@ def insert_trade(
                (trade_id, market_id, side, price, size,
                 noaa_probability, edge, timestamp, status,
                 question, location, event_date_ctx, metric, threshold, comparison,
-                noaa_forecast_high, noaa_forecast_low, noaa_forecast_narrative)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                noaa_forecast_high, noaa_forecast_low, noaa_forecast_narrative,
+                event_id, bucket_index, token_id, outcome_label,
+                fill_price, book_depth, resolution_source)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 trade.trade_id,
                 trade.market_id,
@@ -62,6 +65,14 @@ def insert_trade(
                 ctx.get("noaa_forecast_high"),
                 ctx.get("noaa_forecast_low"),
                 str(ctx.get("noaa_forecast_narrative", "")),
+                trade.event_id,
+                trade.bucket_index,
+                trade.token_id,
+                trade.outcome_label,
+                str(trade.fill_price) if trade.fill_price is not None else None,
+                (str(trade.book_depth_at_signal)
+                 if trade.book_depth_at_signal is not None else None),
+                trade.resolution_source,
             ),
         )
         conn.commit()
@@ -752,6 +763,101 @@ def get_report_data(conn: sqlite3.Connection, days: int = 30) -> dict[str, Any]:
     }
 
 
+def cache_event(conn: sqlite3.Connection, event: WeatherEvent) -> bool:
+    """Cache a multi-outcome weather event's metadata.
+
+    Args:
+        conn: SQLite database connection.
+        event: WeatherEvent to cache.
+
+    Returns:
+        True if cached successfully.
+    """
+    import json
+
+    try:
+        cursor = conn.cursor()
+        bucket_labels = json.dumps([b.outcome_label for b in event.buckets])
+        cursor.execute(
+            """INSERT OR REPLACE INTO events
+               (event_id, question, location, lat, lon, event_date,
+                metric, bucket_count, bucket_labels, cached_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                event.event_id,
+                event.question,
+                event.location,
+                event.lat,
+                event.lon,
+                event.event_date.isoformat(),
+                event.metric,
+                len(event.buckets),
+                bucket_labels,
+                datetime.now(tz=UTC).isoformat(),
+            ),
+        )
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        logger.error("event_cache_failed", event_id=event.event_id, error=str(e))
+        return False
+
+
+def get_event_metadata(
+    conn: sqlite3.Connection, event_id: str
+) -> dict[str, object] | None:
+    """Retrieve cached event metadata.
+
+    Args:
+        conn: SQLite database connection.
+        event_id: Event ID to look up.
+
+    Returns:
+        Dict with event metadata or None if not found.
+    """
+    import json
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM events WHERE event_id = ?", (event_id,))
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return {
+        "event_id": row["event_id"],
+        "question": row["question"],
+        "location": row["location"],
+        "lat": row["lat"],
+        "lon": row["lon"],
+        "event_date": date.fromisoformat(str(row["event_date"])),
+        "metric": row["metric"],
+        "bucket_count": row["bucket_count"],
+        "bucket_labels": json.loads(str(row["bucket_labels"])),
+    }
+
+
+def get_trades_by_event(
+    conn: sqlite3.Connection, event_id: str
+) -> list[dict[str, object]]:
+    """Get all trades for a specific event.
+
+    Args:
+        conn: SQLite database connection.
+        event_id: Event ID to query.
+
+    Returns:
+        List of enriched trade dicts for the event.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        """SELECT * FROM trades
+           WHERE event_id = ?
+           ORDER BY bucket_index ASC, timestamp DESC""",
+        (event_id,),
+    )
+    today = date.today()
+    return [_row_to_context_dict(row, today) for row in cursor.fetchall()]
+
+
 def _row_to_trade(row: sqlite3.Row) -> Trade:
     """Convert a database row to a Trade model.
 
@@ -773,6 +879,13 @@ def _row_to_trade(row: sqlite3.Row) -> Trade:
         status=row["status"],  # type: ignore[arg-type]
         outcome=row["outcome"] if row["outcome"] else None,  # type: ignore[arg-type]
         actual_pnl=Decimal(str(row["actual_pnl"])) if row["actual_pnl"] else None,
+        event_id=str(row["event_id"]) if row["event_id"] else "",
+        bucket_index=int(row["bucket_index"]) if row["bucket_index"] is not None else -1,
+        token_id=str(row["token_id"]) if row["token_id"] else "",
+        outcome_label=str(row["outcome_label"]) if row["outcome_label"] else "",
+        fill_price=Decimal(str(row["fill_price"])) if row["fill_price"] else None,
+        book_depth_at_signal=Decimal(str(row["book_depth"])) if row["book_depth"] else None,
+        resolution_source=str(row["resolution_source"]) if row["resolution_source"] else "",
     )
 
 

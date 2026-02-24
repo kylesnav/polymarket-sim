@@ -12,18 +12,26 @@ from decimal import Decimal
 import structlog
 
 from src.correlation import compute_correlated_exposure
-from src.executor import SimulatedExecutor, TradeExecutor
+from src.executor import PaperExecutor, SimulatedExecutor, TradeExecutor
 from src.journal import Journal
 from src.limits import (
     check_bankroll_limit,
     check_daily_loss,
     check_kill_switch,
 )
-from src.models import NOAAForecast, Portfolio, Signal, Trade, WeatherMarket
+from src.models import (
+    BucketSignal,
+    NOAAForecast,
+    Portfolio,
+    Signal,
+    Trade,
+    WeatherEvent,
+    WeatherMarket,
+)
 from src.noaa import NOAAClient
 from src.polymarket import PolymarketClient
 from src.resolver import resolve_trades
-from src.strategy import scan_weather_markets
+from src.strategy import scan_weather_events, scan_weather_markets
 
 logger = structlog.get_logger()
 
@@ -79,7 +87,8 @@ class Simulator:
         self._polymarket = PolymarketClient()
         self._noaa = NOAAClient()
         self._journal = Journal()
-        self._executor: TradeExecutor = SimulatedExecutor()
+        self._executor: TradeExecutor = PaperExecutor(self._polymarket)
+        self._legacy_executor: TradeExecutor = SimulatedExecutor()
 
         # Restore portfolio state from journal (accounts for existing trades)
         summary = self._journal.get_portfolio_summary(bankroll)
@@ -93,6 +102,7 @@ class Simulator:
         self._bankroll = restored_cash
 
         self._last_markets: list[WeatherMarket] = []
+        self._last_events: list[WeatherEvent] = []
         self._last_forecasts: dict[str, NOAAForecast] = {}
         self._last_skip_reasons: list[dict[str, str]] = []
 
@@ -112,7 +122,7 @@ class Simulator:
         Returns:
             Resolution statistics dict.
         """
-        stats = resolve_trades(self._journal, self._noaa)
+        stats = resolve_trades(self._journal, self._polymarket, self._noaa)
         resolved_count = stats.get("resolved_count", 0)
         if resolved_count:
             logger.info("auto_resolved_trades", count=resolved_count)
@@ -425,6 +435,231 @@ class Simulator:
 
         return trades
 
+    def run_event_scan(self) -> list[BucketSignal]:
+        """Fetch multi-outcome events, get forecasts, generate bucket signals.
+
+        Uses the new multi-outcome pipeline: fetches WeatherEvents, computes
+        NOAA probability distributions, and generates per-bucket signals.
+
+        Returns:
+            List of actionable bucket-level trading signals.
+        """
+        allowed, reason = check_kill_switch(self._kill_switch)
+        if not allowed:
+            logger.warning("event_scan_blocked", reason=reason)
+            return []
+
+        self.resolve_pending()
+        logger.info("starting_event_scan")
+
+        events = self._polymarket.get_weather_events()
+        if not events:
+            logger.info("no_weather_events_found")
+            return []
+
+        today = date.today()
+        active_events = [e for e in events if e.event_date >= today]
+        self._last_events = active_events
+        logger.info("weather_events_found", count=len(active_events))
+
+        forecasts = self._fetch_event_forecasts(active_events)
+        self._last_forecasts = forecasts
+        logger.info("event_forecasts_fetched", count=len(forecasts))
+
+        signals = scan_weather_events(
+            events=active_events,
+            forecasts=forecasts,
+            min_edge=self._min_edge,
+            kelly_fraction=self._kelly_fraction,
+            bankroll=self._bankroll,
+            position_cap_pct=self._position_cap_pct,
+            max_bankroll=self._max_bankroll,
+            daily_loss_limit_pct=self._daily_loss_limit_pct,
+            kill_switch=self._kill_switch,
+            portfolio=self._portfolio,
+            max_forecast_horizon_days=self._max_forecast_horizon_days,
+        )
+
+        logger.info("bucket_signals_generated", count=len(signals))
+        return signals
+
+    def execute_bucket_signals(self, signals: list[BucketSignal]) -> list[Trade]:
+        """Execute paper trades for bucket-level signals.
+
+        Args:
+            signals: List of bucket-level trading signals.
+
+        Returns:
+            List of executed Trade records.
+        """
+        trades: list[Trade] = []
+        self._last_skip_reasons = []
+
+        # Build event lookup
+        event_lookup: dict[str, WeatherEvent] = {
+            e.event_id: e for e in self._last_events
+        }
+
+        for signal in signals:
+            allowed, reason = check_kill_switch(self._kill_switch)
+            if not allowed:
+                self._last_skip_reasons.append({
+                    "market_id": signal.event_id, "reason": "Kill switch engaged",
+                })
+                continue
+
+            allowed, reason = check_daily_loss(
+                self._portfolio.daily_pnl,
+                self._portfolio.starting_bankroll,
+                self._daily_loss_limit_pct,
+            )
+            if not allowed:
+                self._last_skip_reasons.append({
+                    "market_id": signal.event_id, "reason": "Daily loss limit",
+                })
+                continue
+
+            trade_size = signal.recommended_size
+
+            allowed, reason = check_bankroll_limit(
+                cash=self._portfolio.cash,
+                pending=trade_size,
+                total_value=self._portfolio.total_value,
+                max_bankroll=self._max_bankroll,
+            )
+            if not allowed:
+                self._last_skip_reasons.append({
+                    "market_id": signal.event_id, "reason": reason,
+                })
+                continue
+
+            # Create pending trade for log-before-execute
+            trade = Trade(
+                market_id="",
+                side=signal.side,
+                price=signal.market_price,
+                size=trade_size,
+                noaa_probability=signal.noaa_probability,
+                edge=signal.edge,
+                timestamp=datetime.now(tz=UTC),
+                status="pending",
+                event_id=signal.event_id,
+                bucket_index=signal.bucket_index,
+                token_id=signal.token_id,
+                outcome_label=signal.outcome_label,
+            )
+
+            # LOG BEFORE EXECUTE
+            event = event_lookup.get(signal.event_id)
+            context: dict[str, object] | None = None
+            if event:
+                context = {
+                    "question": event.question,
+                    "location": event.location,
+                    "event_date": event.event_date.isoformat(),
+                    "metric": event.metric,
+                    "threshold": 0,
+                    "comparison": "",
+                }
+                forecast = self._last_forecasts.get(signal.event_id)
+                if forecast:
+                    context["noaa_forecast_high"] = forecast.temperature_high
+                    context["noaa_forecast_low"] = forecast.temperature_low
+                    context["noaa_forecast_narrative"] = forecast.forecast_narrative
+                # Cache event for resolution
+                self._journal.cache_event(event)
+
+            logged = self._journal.log_trade(trade, market_context=context)
+            if not logged:
+                self._last_skip_reasons.append({
+                    "market_id": signal.event_id,
+                    "reason": "Trade logging failed",
+                })
+                continue
+
+            try:
+                executor_result = self._executor.execute(signal, trade_size)
+                if executor_result is None:
+                    self._journal.update_trade_status(trade.trade_id, "cancelled")
+                    continue
+
+                self._journal.update_trade_status(trade.trade_id, "filled")
+                filled_trade = Trade(
+                    trade_id=trade.trade_id,
+                    market_id=executor_result.market_id,
+                    side=executor_result.side,
+                    price=executor_result.price,
+                    size=executor_result.size,
+                    noaa_probability=executor_result.noaa_probability,
+                    edge=executor_result.edge,
+                    timestamp=executor_result.timestamp,
+                    status="filled",
+                    event_id=signal.event_id,
+                    bucket_index=signal.bucket_index,
+                    token_id=signal.token_id,
+                    outcome_label=signal.outcome_label,
+                    fill_price=executor_result.fill_price,
+                    book_depth_at_signal=executor_result.book_depth_at_signal,
+                )
+                trades.append(filled_trade)
+
+                new_cash = self._portfolio.cash - trade_size
+                self._portfolio = Portfolio(
+                    cash=new_cash,
+                    total_value=self._portfolio.total_value,
+                    starting_bankroll=self._portfolio.starting_bankroll,
+                )
+                self._bankroll = new_cash
+            except Exception as e:
+                logger.error(
+                    "bucket_trade_execution_failed",
+                    trade_id=trade.trade_id,
+                    error=str(e),
+                )
+                self._journal.update_trade_status(trade.trade_id, "cancelled")
+                continue
+
+            logger.info(
+                "bucket_trade_executed",
+                trade_id=trade.trade_id,
+                event_id=signal.event_id,
+                bucket=signal.outcome_label,
+                side=trade.side,
+                size=str(trade.size),
+            )
+
+        # Save daily snapshot
+        today = date.today()
+        self._journal.save_daily_snapshot(
+            snapshot_date=today,
+            cash=self._portfolio.cash,
+            total_value=self._portfolio.total_value,
+            daily_pnl=self._portfolio.daily_pnl,
+            open_positions=len(self._portfolio.positions),
+            trades_today=len(trades),
+        )
+
+        return trades
+
+    def _fetch_event_forecasts(
+        self, events: list[WeatherEvent]
+    ) -> dict[str, NOAAForecast]:
+        """Fetch NOAA forecasts for a list of events.
+
+        Args:
+            events: Weather events to fetch forecasts for.
+
+        Returns:
+            Dict mapping event_id to NOAAForecast.
+        """
+        if not events:
+            return {}
+
+        requests = [
+            (e.event_id, e.lat, e.lon, e.event_date) for e in events
+        ]
+        return self._noaa.batch_get_forecasts(requests, max_workers=10)
+
     def _fetch_forecasts(
         self, markets: list[WeatherMarket]
     ) -> dict[str, NOAAForecast]:
@@ -443,6 +678,15 @@ class Simulator:
             (m.market_id, m.lat, m.lon, m.event_date) for m in markets
         ]
         return self._noaa.batch_get_forecasts(requests, max_workers=10)
+
+    @property
+    def last_events(self) -> list[WeatherEvent]:
+        """Get events from the most recent event scan.
+
+        Returns:
+            List of WeatherEvent objects from the last event scan.
+        """
+        return self._last_events
 
     @property
     def last_markets(self) -> list[WeatherMarket]:

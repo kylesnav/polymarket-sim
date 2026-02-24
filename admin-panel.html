@@ -6,1957 +6,2631 @@
 <title>Weather Edge Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* ================================================================
+   DELIGHTFUL DESIGN SYSTEM — Neo-Brutalist Weather Trader
+   ================================================================ */
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg-root: #060710;
-  --bg-card: #10111b;
-  --bg-card-hover: #141521;
-  --bg-input: #0d0e18;
-  --border: #1a1c2e;
-  --border-subtle: #131422;
-  --text-1: #e8e8ec;
-  --text-2: #8b8fa8;
-  --text-3: #505370;
-  --green: #00e68a;
-  --green-bg: rgba(0,230,138,0.08);
-  --green-border: rgba(0,230,138,0.2);
-  --red: #ff475a;
-  --red-bg: rgba(255,71,90,0.08);
-  --red-border: rgba(255,71,90,0.2);
-  --amber: #ffb800;
-  --amber-bg: rgba(255,184,0,0.08);
-  --amber-border: rgba(255,184,0,0.2);
-  --blue: #4d8eff;
-  --blue-bg: rgba(77,142,255,0.08);
-  --blue-border: rgba(77,142,255,0.2);
-  --font-display: 'Syne', sans-serif;
+  /* Backgrounds (warm cream) */
+  --bg-page: oklch(0.982 0.008 70);
+  --bg-surface: oklch(0.995 0.004 70);
+  --bg-elevated: oklch(1.00 0.00 0);
+  --bg-subtle: oklch(0.965 0.012 70);
+  --bg-muted: oklch(0.948 0.014 70);
+
+  /* Text */
+  --text-primary: oklch(0.200 0.015 60);
+  --text-secondary: oklch(0.420 0.015 60);
+  --text-muted: oklch(0.560 0.012 60);
+  --text-on-accent: oklch(1.00 0.000 0);
+
+  /* Colors */
+  --accent-primary: oklch(0.640 0.270 350);
+  --accent-danger: oklch(0.620 0.220 20);
+  --accent-gold: oklch(0.840 0.175 85);
+  --accent-cyan: oklch(0.650 0.148 210);
+  --accent-green: oklch(0.630 0.170 148);
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --radius: 10px;
-  --radius-sm: 6px;
+
+  /* Fluid type scale */
+  --step-0: clamp(0.875rem, 0.8rem + 0.25vw, 1rem);
+  --step-1: clamp(1rem, 0.9rem + 0.35vw, 1.2rem);
+  --step-2: clamp(1.2rem, 1rem + 0.5vw, 1.5rem);
+  --step-3: clamp(1.5rem, 1.2rem + 0.7vw, 2rem);
+  --step-4: clamp(2rem, 1.6rem + 1vw, 2.8rem);
+  --step-5: clamp(2.8rem, 2rem + 1.5vw, 4rem);
+
+  /* Borders & Shadows (Neo-Brutalist) */
+  --border-width: 2px;
+  --border-color: var(--text-primary);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --shadow-sm: 2px 2px 0 var(--text-primary);
+  --shadow-md: 4px 4px 0 var(--text-primary);
+  --shadow-lg: 8px 8px 0 var(--text-primary);
+
+  /* Motion */
+  --motion-fast: 160ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Overlay */
+  --overlay-bg: oklch(0.200 0.015 60 / 0.30);
 }
 
-html { font-size: 14px; }
+/* ── Dark Mode (synced with delightful-design-system) ── */
+[data-theme="dark"] {
+  /* Warm dark backgrounds — hue 65 for amber-tinted darkness */
+  --bg-page: oklch(0.140 0.014 65);
+  --bg-surface: oklch(0.165 0.015 65);
+  --bg-elevated: oklch(0.190 0.015 65);
+  --bg-subtle: oklch(0.210 0.015 65);
+  --bg-muted: oklch(0.180 0.013 65);
+
+  /* Text */
+  --text-primary: oklch(0.935 0.008 70);
+  --text-secondary: oklch(0.690 0.012 70);
+  --text-muted: oklch(0.540 0.010 70);
+  --text-on-accent: oklch(1.00 0.000 0);
+  --text-on-gold: oklch(0.140 0.014 65);
+
+  /* Borders */
+  --border-color: var(--text-primary);
+  --border-subtle: oklch(0.330 0.015 65);
+
+  /* Accent colors — brighter for dark backgrounds */
+  --accent-primary: oklch(0.700 0.230 350);
+  --accent-primary-hover: oklch(0.740 0.220 350);
+  --accent-primary-subtle: oklch(0.250 0.065 350);
+  --accent-primary-text: oklch(0.750 0.210 350);
+
+  --accent-danger: oklch(0.660 0.200 20);
+  --accent-danger-hover: oklch(0.700 0.190 20);
+  --accent-danger-subtle: oklch(0.250 0.055 20);
+  --accent-danger-text: oklch(0.720 0.180 20);
+
+  --accent-gold: oklch(0.840 0.170 85);
+  --accent-gold-hover: oklch(0.870 0.155 84);
+  --accent-gold-subtle: oklch(0.260 0.065 85);
+  --accent-gold-text: oklch(0.870 0.155 85);
+
+  --accent-cyan: oklch(0.720 0.140 210);
+  --accent-cyan-hover: oklch(0.760 0.130 210);
+  --accent-cyan-subtle: oklch(0.250 0.045 210);
+  --accent-cyan-text: oklch(0.780 0.130 210);
+
+  --accent-green: oklch(0.680 0.155 148);
+  --accent-green-hover: oklch(0.720 0.145 148);
+  --accent-green-subtle: oklch(0.250 0.048 148);
+  --accent-green-text: oklch(0.740 0.145 148);
+
+  /* Overlay */
+  --overlay-bg: oklch(0 0 0 / 0.60);
+
+  /* Neo-Brutalist shadows — cream on dark for visible 3D */
+  --shadow-sm: 2px 2px 0 oklch(0.92 0.010 65);
+  --shadow-md: 4px 4px 0 oklch(0.92 0.010 65);
+  --shadow-lg: 8px 8px 0 oklch(0.92 0.010 65);
+  --shadow-pink: 4px 4px 0 var(--accent-primary);
+  --shadow-danger: 4px 4px 0 var(--accent-danger);
+  --shadow-gold: 4px 4px 0 var(--accent-gold);
+  --shadow-cyan: 4px 4px 0 var(--accent-cyan);
+  --shadow-green: 4px 4px 0 var(--accent-green);
+}
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
 body {
-  font-family: var(--font-mono);
-  background: var(--bg-root);
-  color: var(--text-1);
+  font-family: var(--font-sans);
+  background: var(--bg-page);
+  color: var(--text-primary);
   min-height: 100vh;
-}
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(77,142,255,0.04), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0,230,138,0.03), transparent);
-  pointer-events: none;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-.dashboard { position: relative; z-index: 1; padding: 0 24px 48px; max-width: 1520px; margin: 0 auto; }
+/* ================================================================
+   LAYOUT
+   ================================================================ */
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--space-lg) var(--space-2xl);
+}
 
 /* ── Topbar ── */
 .topbar {
-  display: flex; align-items: center; gap: 20px; padding: 16px 0;
-  border-bottom: 1px solid var(--border); margin-bottom: 0;
-  position: sticky; top: 0; z-index: 100; background: var(--bg-root);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) 0;
+  border-bottom: var(--border-width) solid var(--border-color);
+  margin-bottom: var(--space-lg);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-page);
 }
-.topbar::after {
-  content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--blue), var(--green), transparent); opacity: 0.3;
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
-.bot-name {
-  font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; letter-spacing: -0.02em;
-  color: var(--text-1);
+
+.topbar-logo {
+  width: 36px;
+  height: 36px;
+  background: var(--accent-primary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
 }
-.status-badge {
-  display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; border-radius: 20px;
-  background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border);
+
+.topbar-title {
+  font-family: var(--font-sans);
+  font-weight: 900;
+  font-size: var(--step-2);
+  letter-spacing: -0.03em;
 }
-.status-badge.halted { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse-dot 2s ease-in-out infinite; }
-@keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
 .topbar-spacer { flex: 1; }
-.topbar-stat { display: flex; flex-direction: column; gap: 1px; }
-.topbar-stat-label { font-size: 0.65rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; }
-.topbar-stat-value { font-size: 0.9rem; font-weight: 600; }
-.topbar-stat-value.positive { color: var(--green); }
-.topbar-stat-value.negative { color: var(--red); }
-.topbar-divider { width: 1px; height: 32px; background: var(--border); }
-.kill-switch-wrap { display: flex; align-items: center; gap: 10px; margin-left: 8px; }
-.kill-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--red); opacity: 0.7; }
-.kill-toggle { position: relative; width: 52px; height: 28px; cursor: pointer; }
+
+.topbar-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.topbar-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.topbar-stat-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.topbar-stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  font-weight: 700;
+}
+
+.topbar-divider {
+  width: var(--border-width);
+  height: 32px;
+  background: var(--border-color);
+}
+
+/* ── Status Badge ── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: var(--border-width) solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.status-badge.live {
+  background: var(--accent-green);
+  color: var(--text-on-accent);
+}
+
+.status-badge.halted {
+  background: var(--accent-danger);
+  color: var(--text-on-accent);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Theme Toggle ── */
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: transform var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
+}
+
+[data-theme="dark"] .theme-toggle {
+  border-color: var(--border-subtle);
+  box-shadow: none;
+}
+
+.theme-toggle:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .theme-toggle:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-toggle:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+/* ── Kill Switch ── */
+.kill-switch-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.kill-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-danger);
+}
+
+.kill-toggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  cursor: pointer;
+}
+
 .kill-toggle input { display: none; }
-.kill-track { position: absolute; inset: 0; border-radius: 14px; background: var(--bg-card); border: 2px solid var(--border); transition: all 0.3s; }
-.kill-knob { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--text-2); transition: all 0.3s; z-index: 1; }
-.kill-toggle input:checked ~ .kill-track { background: var(--red); border-color: var(--red); box-shadow: 0 0 20px rgba(255,71,90,0.4); }
-.kill-toggle input:checked ~ .kill-knob { left: 28px; background: #fff; }
+
+.kill-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 13px;
+  background: var(--bg-muted);
+  border: var(--border-width) solid var(--border-color);
+  transition: all var(--motion-fast) var(--ease-out);
+}
+
+.kill-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  border: var(--border-width) solid var(--border-color);
+  transition: all var(--motion-fast) var(--ease-out);
+  z-index: 1;
+}
+
+.kill-toggle input:checked ~ .kill-track {
+  background: var(--accent-danger);
+  border-color: var(--accent-danger);
+}
+
+.kill-toggle input:checked ~ .kill-knob {
+  left: 25px;
+  background: var(--text-on-accent);
+}
 
 /* ── Tab Navigation ── */
 .tab-nav {
-  display: flex; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--border);
-  margin-bottom: 20px; overflow-x: auto; position: sticky; top: 56px; z-index: 99;
-  background: var(--bg-root);
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-md) 0;
+  margin-bottom: var(--space-lg);
+  overflow-x: auto;
 }
+
 .tab-btn {
-  padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid transparent;
-  background: transparent; color: var(--text-3); font-family: var(--font-mono);
-  font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--step-0);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-out);
   white-space: nowrap;
 }
-.tab-btn:hover { color: var(--text-2); background: var(--bg-card); }
-.tab-btn.active { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
 
-/* ── Tooltip ── */
-.tip {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; border-radius: 50%; margin-left: 4px;
-  background: var(--bg-input); border: 1px solid var(--border);
-  color: var(--text-3); font-size: 0.58rem; cursor: help;
-  position: relative; vertical-align: middle; font-weight: 700;
-}
-.tip:hover::after {
-  content: attr(data-tip);
-  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 10px 14px;
-  font-size: 0.72rem; font-weight: 400; color: var(--text-2); width: 260px;
-  white-space: normal; z-index: 200; pointer-events: none;
-  line-height: 1.5; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+.tab-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
 }
 
-/* ── Section ── */
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.section-title {
-  font-family: var(--font-display); font-weight: 700; font-size: 1rem; letter-spacing: -0.01em;
-  color: var(--text-1); display: flex; align-items: center; gap: 10px;
+.tab-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-page);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
-.section-title::before { content: ''; width: 3px; height: 16px; border-radius: 2px; background: var(--blue); }
-.section-controls { display: flex; gap: 6px; }
-.pill-btn {
-  padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent;
-  color: var(--text-2); font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500;
-  cursor: pointer; transition: all 0.2s;
-}
-.pill-btn:hover { border-color: var(--text-3); color: var(--text-1); }
-.pill-btn.active { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
-.tab-description { color: var(--text-2); font-size: 0.82rem; line-height: 1.6; margin-bottom: 20px; }
 
-/* ── Cards ── */
-.cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+/* ── Tab Panels ── */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ================================================================
+   CARDS — Neo-Brutalist
+   ================================================================ */
+
 .card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 18px 20px; position: relative; overflow: hidden; cursor: default;
-  transition: border-color 0.2s;
+  background: var(--bg-surface);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
+  transition: transform var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
 }
-.card:hover { border-color: var(--border); }
-.card.clickable { cursor: pointer; }
-.card.clickable:hover { border-color: var(--amber-border); background: var(--bg-card-hover); }
-.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.6; }
-.card.accent-green::before { background: linear-gradient(90deg, var(--green), transparent); }
-.card.accent-amber::before { background: linear-gradient(90deg, var(--amber), transparent); }
-.card.accent-blue::before { background: linear-gradient(90deg, var(--blue), transparent); }
-.card.accent-pnl::before { background: linear-gradient(90deg, var(--green), var(--blue), transparent); }
-.card-label { font-size: 0.7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
-.card-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
-.card-value.positive { color: var(--green); }
-.card-value.negative { color: var(--red); }
-.card-sub { font-size: 0.75rem; color: var(--text-2); margin-top: 4px; }
 
-/* ── Next Steps Banner ── */
-.next-steps {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px 24px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px;
-  font-size: 0.85rem; line-height: 1.5;
+.card-hoverable:hover {
+  transform: translate(-4px, -4px);
+  box-shadow: var(--shadow-lg);
 }
-.next-steps-icon { font-size: 1.4rem; flex-shrink: 0; }
-.next-steps-text { flex: 1; color: var(--text-2); }
-.next-steps-text strong { color: var(--text-1); }
-.next-steps .action-btn { flex-shrink: 0; font-size: 0.75rem; padding: 6px 16px; }
 
-/* ── Chart ── */
-.chart-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
-.chart-wrap { position: relative; height: 240px; margin-top: 10px; }
-.chart-wrap canvas { width: 100%; height: 100%; }
-.chart-tooltip { position: absolute; background: #1a1c2e; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 0.75rem; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 10; white-space: nowrap; }
-.chart-tooltip.visible { opacity: 1; }
-.chart-crosshair { position: absolute; top: 0; width: 1px; height: 100%; background: rgba(77,142,255,0.2); pointer-events: none; opacity: 0; transition: opacity 0.15s; }
-.chart-crosshair.visible { opacity: 1; }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
 
-/* ── Action ── */
-.action-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
-.action-btn {
-  padding: 8px 20px; border-radius: var(--radius-sm); border: 1px solid var(--border);
-  background: var(--bg-card); color: var(--text-1); font-family: var(--font-mono);
-  font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
-  display: flex; align-items: center; gap: 8px;
+.card-title {
+  font-weight: 800;
+  font-size: var(--step-1);
+  letter-spacing: -0.02em;
 }
-.action-btn:hover { border-color: var(--blue); background: var(--bg-card-hover); }
-.action-btn.loading, .action-btn:disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
-.action-btn.loading::after {
-  content: ''; width: 12px; height: 12px; border: 2px solid var(--text-3);
-  border-top-color: var(--blue); border-radius: 50%; animation: spin 0.6s linear infinite;
+
+.card-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
+
+/* ── Metric Cards ── */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.metric-card {
+  background: var(--bg-surface);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-md) var(--space-lg);
+  transition: transform var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
+}
+
+.metric-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: var(--step-3);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.metric-sub {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ── Color Variants ── */
+.text-green { color: var(--accent-green); }
+.text-red { color: var(--accent-danger); }
+.text-cyan { color: var(--accent-cyan); }
+.text-gold { color: var(--accent-gold); }
+.text-pink { color: var(--accent-primary); }
+.text-muted { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+
+.bg-green { background: var(--accent-green); color: var(--text-on-accent); }
+.bg-red { background: var(--accent-danger); color: var(--text-on-accent); }
+.bg-cyan { background: var(--accent-cyan); color: var(--text-on-accent); }
+.bg-gold { background: var(--accent-gold); color: var(--text-primary); }
+.bg-pink { background: var(--accent-primary); color: var(--text-on-accent); }
+
+/* ================================================================
+   BUTTONS
+   ================================================================ */
+
+.btn {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--step-0);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: transform var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+}
+
+.btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+}
+
+.btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.btn-danger {
+  background: var(--accent-danger);
+  color: var(--text-on-accent);
+}
+
+.btn-success {
+  background: var(--accent-green);
+  color: var(--text-on-accent);
+}
+
+.btn-sm {
+  font-size: 0.75rem;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.btn-lg {
+  font-size: var(--step-1);
+  padding: var(--space-md) var(--space-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-lg:hover { box-shadow: var(--shadow-lg); }
+
+/* ================================================================
+   FORMS
+   ================================================================ */
+
+.form-group {
+  margin-bottom: var(--space-md);
+}
+
+.form-label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-bottom: var(--space-xs);
+  color: var(--text-secondary);
+}
+
+.form-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  transition: box-shadow var(--motion-fast) var(--ease-out);
+}
+
+.form-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-primary);
+}
+
+/* ================================================================
+   TABLES
+   ================================================================ */
+
+.table-wrap {
+  overflow-x: auto;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--step-0);
+}
+
+th {
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-subtle);
+  border-bottom: var(--border-width) solid var(--border-color);
+}
+
+td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--bg-muted);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+tr:last-child td { border-bottom: none; }
+
+tr:hover td {
+  background: var(--bg-subtle);
+}
+
+/* ================================================================
+   BADGE / PILL
+   ================================================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 100px;
+  border: var(--border-width) solid var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge-green { background: var(--accent-green); color: var(--text-on-accent); }
+.badge-red { background: var(--accent-danger); color: var(--text-on-accent); }
+.badge-cyan { background: var(--accent-cyan); color: var(--text-on-accent); }
+.badge-gold { background: var(--accent-gold); color: var(--text-primary); }
+.badge-pink { background: var(--accent-primary); color: var(--text-on-accent); }
+.badge-muted {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  border-color: var(--text-muted);
+}
+
+/* ================================================================
+   SAFETY RAILS
+   ================================================================ */
+
+.safety-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+
+.safety-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-subtle);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.safety-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border: var(--border-width) solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.safety-ok .safety-icon { background: var(--accent-green); }
+.safety-warn .safety-icon { background: var(--accent-gold); }
+.safety-error .safety-icon { background: var(--accent-danger); }
+
+.safety-text-label {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.safety-text-value {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ================================================================
+   EQUITY CURVE (Canvas)
+   ================================================================ */
+
+.equity-canvas-wrap {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.equity-canvas-wrap canvas {
+  width: 100%;
+  height: 260px;
+  display: block;
+}
+
+/* ================================================================
+   RECENT ACTIVITY (Dashboard)
+   ================================================================ */
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--bg-muted);
+}
+
+.activity-item:last-child { border-bottom: none; }
+
+.activity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: var(--border-width) solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.activity-text {
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+.activity-time {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ================================================================
+   BUCKET DISTRIBUTION CHART
+   ================================================================ */
+
+.event-card {
+  background: var(--bg-surface);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--space-lg);
+  overflow: hidden;
+  transition: transform var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
+}
+
+.event-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.event-card-header {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: var(--border-width) solid var(--border-color);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.event-meta {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.event-question {
+  font-weight: 800;
+  font-size: var(--step-1);
+  letter-spacing: -0.01em;
+}
+
+.bucket-chart {
+  padding: var(--space-md) var(--space-lg);
+}
+
+/* ── Bets Table ── */
+.bets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--step--1);
+}
+
+.bets-table thead th {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: var(--border-width) solid var(--border-color);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.bets-table thead th.num { text-align: right; }
+
+.bets-table tbody td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--bg-muted);
+  vertical-align: middle;
+}
+
+.bets-table tbody td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bets-table tbody tr:last-child td { border-bottom: none; }
+
+.bets-table tbody tr:hover {
+  background: var(--bg-subtle);
+}
+
+.bet-label {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── Bet Slip ── */
+.bet-slip {
+  position: fixed;
+  bottom: var(--space-lg);
+  right: var(--space-lg);
+  width: 360px;
+  background: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  transform: translateY(calc(100% + 40px));
+  transition: transform 300ms var(--ease-bounce);
+  overflow: hidden;
+}
+
+.bet-slip.visible {
+  transform: translateY(0);
+}
+
+.bet-slip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  font-weight: 800;
+  font-size: var(--step-1);
+  border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.bet-slip-count {
+  background: var(--text-on-accent);
+  color: var(--accent-primary);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 800;
+  border: var(--border-width) solid var(--border-color);
+}
+
+.bet-slip-body {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: var(--space-md);
+}
+
+.bet-slip-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--bg-muted);
+  font-size: 0.8rem;
+}
+
+.bet-slip-item:last-child { border-bottom: none; }
+
+.bet-slip-item-label {
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bet-slip-item-edge {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.bet-slip-footer {
+  padding: var(--space-md) var(--space-lg);
+  border-top: var(--border-width) solid var(--border-color);
+}
+
+/* ================================================================
+   LOG VIEWER
+   ================================================================ */
+
+.log-viewer {
+  background: var(--bg-surface);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: 600px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.log-entry {
+  display: grid;
+  grid-template-columns: 180px 60px 1fr;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--bg-muted);
+  transition: background var(--motion-fast);
+}
+
+.log-entry:hover { background: var(--bg-subtle); }
+
+.log-ts { color: var(--text-muted); }
+.log-level { font-weight: 700; text-transform: uppercase; }
+.log-level.info { color: var(--accent-cyan); }
+.log-level.warning { color: var(--accent-gold); }
+.log-level.error { color: var(--accent-danger); }
+.log-level.debug { color: var(--text-muted); }
+.log-msg { color: var(--text-primary); word-break: break-word; }
+
+/* ================================================================
+   ACCORDION (Settings)
+   ================================================================ */
+
+.accordion {
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-subtle);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: var(--step-0);
+  color: var(--text-primary);
+  transition: background var(--motion-fast);
+}
+
+.accordion-trigger:hover { background: var(--bg-muted); }
+
+.accordion-arrow {
+  transition: transform 300ms var(--ease-out);
+  font-size: 1.2rem;
+}
+
+.accordion-trigger.open .accordion-arrow {
+  transform: rotate(180deg);
+}
+
+.accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms var(--ease-out);
+}
+
+.accordion-content.open {
+  max-height: 2000px;
+}
+
+.accordion-inner {
+  padding: var(--space-lg);
+  font-size: 0.9rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+/* ================================================================
+   POSITION CARD (Portfolio)
+   ================================================================ */
+
+.position-group {
+  margin-bottom: var(--space-lg);
+}
+
+.position-group-title {
+  font-weight: 800;
+  font-size: var(--step-1);
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.position-group-count {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ================================================================
+   LOADING / EMPTY STATES
+   ================================================================ */
+
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--bg-muted);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
-.action-btn.primary { border-color: var(--blue-border); background: var(--blue-bg); color: var(--blue); }
-.action-btn.primary:hover { background: rgba(77,142,255,0.15); }
-.action-btn.amber { border-color: var(--amber-border); background: var(--amber-bg); color: var(--amber); }
-.action-btn.amber:hover { background: rgba(255,184,0,0.15); }
-.action-output {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 14px 20px; margin-bottom: 20px; font-size: 0.8rem; line-height: 1.6;
-  color: var(--text-2); display: none; white-space: pre-wrap;
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
 }
-.action-output.visible { display: block; }
-.action-output .success { color: var(--green); }
-.action-output .error { color: var(--red); }
-.action-output .info { color: var(--blue); }
 
-/* ── Tables ── */
-.table-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; }
-thead th { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); text-align: left; padding: 0 12px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: 600; }
-thead th:last-child { text-align: right; }
-tbody td { padding: 10px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; color: var(--text-2); }
-tbody td:last-child { text-align: right; }
-tbody tr { transition: background 0.15s; cursor: pointer; }
-tbody tr:hover { background: rgba(77,142,255,0.03); }
-tbody tr:last-child td { border-bottom: none; }
-.empty-row td { text-align: center !important; color: var(--text-3); padding: 24px 12px; cursor: default; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
-.badge-yes { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-.badge-no { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
-.badge-open { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-.badge-ready { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
-.badge-resolved { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
-.badge-won { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-.badge-lost { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
-.edge-strong { color: var(--green); font-weight: 600; }
-.edge-marginal { color: var(--amber); font-weight: 600; }
-.val-pos { color: var(--green); }
-.val-neg { color: var(--red); }
-.table-filters { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; }
-.filter-select {
-  padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
-  background: var(--bg-input); color: var(--text-2); font-family: var(--font-mono); font-size: 0.75rem;
-  cursor: pointer; appearance: none; padding-right: 28px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23505370'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 10px center;
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-md);
+  opacity: 0.5;
 }
-.filter-select:focus { outline: none; border-color: var(--blue); }
-.pagination { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-.page-btn { width: 30px; height: 30px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text-2); font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; display: grid; place-items: center; transition: all 0.2s; }
-.page-btn:hover { border-color: var(--text-3); color: var(--text-1); }
-.page-btn.active { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
-.page-info { font-size: 0.7rem; color: var(--text-3); }
 
-/* ── Report Stats ── */
-.report-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
-.report-stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; }
-.report-stat-label { font-size: 0.65rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
-.report-stat-value { font-size: 1.1rem; font-weight: 700; }
-
-/* ── Risk ── */
-.risk-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
-.risk-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
-.risk-card-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin-bottom: 16px; font-weight: 600; }
-.gauge-wrap { display: flex; justify-content: center; align-items: center; position: relative; }
-.gauge-wrap svg { overflow: visible; }
-.gauge-center { position: absolute; text-align: center; }
-.gauge-value { font-size: 1.4rem; font-weight: 700; display: block; }
-.gauge-label { font-size: 0.65rem; color: var(--text-3); display: block; margin-top: 2px; }
-.bar-group { display: flex; flex-direction: column; gap: 12px; }
-.bar-item-label { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px; }
-.bar-item-label span:first-child { color: var(--text-2); }
-.bar-item-label span:last-child { color: var(--text-1); font-weight: 600; }
-
-/* ── Modal ── */
-.modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
-.modal-overlay.open { opacity: 1; pointer-events: auto; }
-.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; width: 520px; max-width: 92vw; max-height: 80vh; overflow-y: auto; padding: 28px; transform: translateY(20px); transition: transform 0.25s; }
-.modal-overlay.open .modal { transform: translateY(0); }
-.modal-close { position: absolute; top: 16px; right: 16px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-3); font-size: 1rem; cursor: pointer; display: grid; place-items: center; transition: all 0.2s; }
-.modal-close:hover { color: var(--text-1); border-color: var(--text-3); }
-.modal-title { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; margin-bottom: 20px; padding-right: 40px; }
-.modal-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); font-size: 0.82rem; }
-.modal-row:last-child { border-bottom: none; }
-.modal-row-label { color: var(--text-3); }
-.modal-row-value { color: var(--text-1); font-weight: 500; text-align: right; }
-.modal-section-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin: 16px 0 8px; font-weight: 600; }
-
-/* ── Lifecycle Section Headers ── */
-.lifecycle-section { margin-bottom: 24px; }
-.lifecycle-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-.lifecycle-header h3 { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; }
-.lifecycle-count { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
-.lifecycle-header.open h3 { color: var(--green); }
-.lifecycle-header.open .lifecycle-count { background: var(--green-bg); color: var(--green); }
-.lifecycle-header.ready h3 { color: var(--amber); }
-.lifecycle-header.ready .lifecycle-count { background: var(--amber-bg); color: var(--amber); }
-.lifecycle-header.resolved h3 { color: var(--blue); }
-.lifecycle-header.resolved .lifecycle-count { background: var(--blue-bg); color: var(--blue); }
-.lifecycle-empty { color: var(--text-3); font-size: 0.8rem; padding: 12px 0; }
-
-/* ── Bet Cards ── */
-.bet-card {
-  background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: center; gap: 16px;
-  cursor: pointer; transition: all 0.15s;
+.empty-state-text {
+  font-weight: 600;
+  font-size: var(--step-1);
 }
-.bet-card:hover { border-color: var(--blue-border); background: var(--bg-card-hover); }
-.bet-card-main { flex: 1; min-width: 0; }
-.bet-card-desc { font-size: 0.82rem; color: var(--text-1); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bet-card-meta { font-size: 0.72rem; color: var(--text-3); display: flex; gap: 12px; flex-wrap: wrap; }
-.bet-card-money { text-align: right; flex-shrink: 0; }
-.bet-card-stake { font-size: 0.85rem; font-weight: 600; color: var(--text-1); }
-.bet-card-payout { font-size: 0.72rem; color: var(--green); margin-top: 2px; }
-.bet-card-pnl { font-size: 0.85rem; font-weight: 600; }
-.bet-card-countdown { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; font-weight: 500; }
-.countdown-future { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-.countdown-ready { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
 
-/* ── Onboarding ── */
-.onboarding { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin-bottom: 24px; }
-.onboarding h2 { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; margin-bottom: 12px; }
-.onboarding p { color: var(--text-2); line-height: 1.7; margin-bottom: 24px; font-size: 0.85rem; }
-.onboarding-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.step-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
-.step-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--blue-bg); color: var(--blue); font-weight: 700; font-size: 0.85rem; margin-bottom: 10px; border: 1px solid var(--blue-border); }
-.step-card h3 { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
-.step-card p { color: var(--text-2); font-size: 0.78rem; line-height: 1.6; margin-bottom: 12px; }
-.step-card .action-btn { font-size: 0.72rem; padding: 6px 14px; }
+/* ================================================================
+   SETTINGS GRID
+   ================================================================ */
 
-/* ── Settings Tab ── */
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.form-group { margin-bottom: 18px; }
-.form-label { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin-bottom: 6px; font-weight: 600; }
-.form-input { width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-input); color: var(--text-1); font-family: var(--font-mono); font-size: 0.85rem; transition: border-color 0.2s; }
-.form-input:focus { outline: none; border-color: var(--blue); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.form-hint { font-size: 0.65rem; color: var(--text-3); margin-top: 4px; }
-.modal-kill-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--border); margin-top: 8px; }
-.modal-kill-label { font-size: 0.85rem; color: var(--red); font-weight: 600; }
-.save-btn { width: 100%; padding: 12px; border-radius: var(--radius-sm); border: none; background: linear-gradient(135deg, var(--blue), #2563eb); color: #fff; font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
-.save-btn:hover { filter: brightness(1.1); }
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-md);
+}
 
-/* ── Activity Log ── */
-.log-viewer { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; max-height: 500px; overflow-y: auto; font-size: 0.78rem; line-height: 1.8; }
-.log-entry { display: flex; gap: 10px; padding: 2px 0; border-bottom: 1px solid var(--border-subtle); }
-.log-entry:last-child { border-bottom: none; }
-.log-time { color: var(--text-3); min-width: 80px; }
-.log-level { min-width: 60px; font-weight: 600; text-transform: uppercase; font-size: 0.68rem; }
-.log-level.info { color: var(--blue); }
-.log-level.warning { color: var(--amber); }
-.log-level.error { color: var(--red); }
-.log-level.debug { color: var(--text-3); }
-.log-msg { color: var(--text-2); }
-.log-extra { color: var(--text-3); font-size: 0.7rem; }
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
 
-/* ── Caveat Banner ── */
-.caveat-banner { background: var(--amber-bg); border: 1px solid var(--amber-border); border-radius: var(--radius); padding: 14px 20px; margin-bottom: 20px; font-size: 0.8rem; color: var(--amber); line-height: 1.6; }
+@media (max-width: 900px) {
+  .topbar-stats { display: none; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .bucket-row { grid-template-columns: 100px 1fr 60px 32px; }
+  .bet-slip { width: calc(100vw - 32px); right: 16px; left: 16px; }
+}
 
-/* ── How It Works ── */
-.how-section { margin-bottom: 32px; }
-.how-section h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; margin-bottom: 12px; color: var(--text-1); }
-.how-section p { color: var(--text-2); font-size: 0.82rem; line-height: 1.7; margin-bottom: 10px; }
-.flow-diagram { display: flex; align-items: stretch; gap: 0; margin: 24px 0; overflow-x: auto; padding-bottom: 8px; }
-.flow-step { flex: 1; min-width: 160px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
-.flow-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--blue-bg); color: var(--blue); font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; border: 1px solid var(--blue-border); }
-.flow-label { font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; }
-.flow-detail { color: var(--text-3); font-size: 0.72rem; line-height: 1.5; }
-.flow-arrow { display: flex; align-items: center; color: var(--text-3); font-size: 1.2rem; padding: 0 6px; }
-.glossary-table { width: 100%; }
-.glossary-table td { padding: 10px 14px; vertical-align: top; }
-.glossary-table td:first-child { color: var(--blue); font-weight: 600; width: 180px; white-space: nowrap; }
-.glossary-table td:last-child { color: var(--text-2); line-height: 1.6; }
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+@media (max-width: 600px) {
+  .app { padding: 0 var(--space-md); }
+  .metrics-grid { grid-template-columns: 1fr; }
+  .tab-btn { font-size: 0.8rem; padding: var(--space-xs) var(--space-sm); }
+}
+
+/* ================================================================
+   TOAST NOTIFICATIONS
+   ================================================================ */
+
+.toast-container {
+  position: fixed;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.toast {
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-weight: 600;
+  font-size: 0.85rem;
+  animation: toast-in 300ms var(--ease-bounce);
+  max-width: 360px;
+}
+
+.toast.success { border-left: 4px solid var(--accent-green); }
+.toast.error { border-left: 4px solid var(--accent-danger); }
+.toast.info { border-left: 4px solid var(--accent-cyan); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ================================================================
+   SECTION HEADERS
+   ================================================================ */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.section-title {
+  font-weight: 800;
+  font-size: var(--step-2);
+  letter-spacing: -0.02em;
+}
+
+/* ================================================================
+   PORTFOLIO LIFECYCLE
+   ================================================================ */
+
+.lifecycle-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.lifecycle-tab {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: var(--space-xs) var(--space-md);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
+}
+
+.lifecycle-tab.active {
+  background: var(--text-primary);
+  color: var(--bg-page);
+}
+
+.lifecycle-panel { display: none; }
+.lifecycle-panel.active { display: block; }
+
+/* ================================================================
+   SCAN OVERLAY
+   ================================================================ */
+
+.scan-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 250;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms;
+}
+
+.scan-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.scan-modal {
+  background: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2xl);
+  text-align: center;
+  max-width: 360px;
+}
+
+.scan-modal .spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto var(--space-md);
+}
+
+.scan-modal p {
+  font-weight: 700;
+  font-size: var(--step-1);
+}
+
 </style>
 </head>
 <body>
+<div class="app">
 
-<div class="dashboard">
-
-  <!-- ═══ SIM BANNER ═══ -->
-  <div style="background:linear-gradient(90deg,rgba(77,142,255,0.12),rgba(0,230,138,0.08));border:1px solid var(--blue-border);border-radius:var(--radius);padding:10px 20px;margin-bottom:0;display:flex;align-items:center;gap:10px;font-size:0.78rem;color:var(--blue)">
-    <span style="font-size:1.1rem">&#9888;</span>
-    <span><strong>PAPER SIMULATION</strong> — No real funds at risk. All bets use simulated money.</span>
-  </div>
-
-  <!-- ═══ TOP BAR ═══ -->
+  <!-- ============================================================
+       TOPBAR
+       ============================================================ -->
   <header class="topbar">
-    <div class="bot-name">Weather Edge Tracker</div>
-    <div class="status-badge" id="statusBadge">
+    <div class="topbar-brand">
+      <div class="topbar-logo">W</div>
+      <span class="topbar-title">Weather Edge</span>
+    </div>
+
+    <div id="statusBadge" class="status-badge live">
       <span class="status-dot"></span>
-      <span id="statusText">Paper Sim</span>
+      <span id="statusText">LIVE</span>
     </div>
+
     <div class="topbar-spacer"></div>
-    <div class="topbar-stat">
-      <span class="topbar-stat-label">Portfolio</span>
-      <span class="topbar-stat-value" id="topBankroll">--</span>
-      <span class="topbar-stat-label" id="topCashExposure" style="margin-top:1px"></span>
+
+    <div class="topbar-stats">
+      <div class="topbar-stat">
+        <span class="topbar-stat-label">Bankroll</span>
+        <span class="topbar-stat-value" id="topBankroll">$0</span>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-stat">
+        <span class="topbar-stat-label">Open</span>
+        <span class="topbar-stat-value" id="topOpen">0</span>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-stat">
+        <span class="topbar-stat-label">P&L</span>
+        <span class="topbar-stat-value" id="topPnl">$0.00</span>
+      </div>
     </div>
+
     <div class="topbar-divider"></div>
-    <div class="topbar-stat">
-      <span class="topbar-stat-label">Bets</span>
-      <span class="topbar-stat-value" id="topBets">--</span>
-    </div>
-    <div class="topbar-divider"></div>
+
     <div class="kill-switch-wrap">
       <span class="kill-label">Kill</span>
       <label class="kill-toggle">
-        <input type="checkbox" id="killSwitch">
+        <input type="checkbox" id="killSwitch" onchange="toggleKillSwitch(this.checked)">
         <span class="kill-track"></span>
         <span class="kill-knob"></span>
       </label>
     </div>
+
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+      <span id="themeIcon">&#9790;</span>
+    </button>
   </header>
 
-  <!-- ═══ TAB NAVIGATION ═══ -->
+  <!-- ============================================================
+       TAB NAVIGATION
+       ============================================================ -->
   <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-    <button class="tab-btn" data-tab="scan">Scan Markets</button>
-    <button class="tab-btn" data-tab="simulate">Find &amp; Place Bets</button>
-    <button class="tab-btn" data-tab="history">My Bets</button>
-    <button class="tab-btn" data-tab="positions">Positions &amp; P&amp;L</button>
-    <button class="tab-btn" data-tab="logs">Activity Log</button>
-    <button class="tab-btn" data-tab="settings">Settings</button>
-    <button class="tab-btn" data-tab="how">How It Works</button>
+    <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+    <button class="tab-btn" data-tab="markets" onclick="switchTab('markets')">Markets</button>
+    <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">Portfolio</button>
+    <button class="tab-btn" data-tab="activity" onclick="switchTab('activity')">Activity</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
   </nav>
 
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: DASHBOARD                                      -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content active" id="tab-dashboard">
+  <!-- ============================================================
+       TAB: DASHBOARD
+       ============================================================ -->
+  <section id="tab-dashboard" class="tab-panel active">
 
-    <!-- Onboarding (shown when no data) -->
-    <div class="onboarding" id="onboarding">
-      <h2>Welcome to Weather Edge Tracker</h2>
-      <p>This tool finds mispriced weather prediction contracts on Polymarket by comparing market prices against free NOAA government weather forecasts. It runs in simulation mode &mdash; tracking practice bets with fake money to prove the strategy works before risking real dollars.</p>
-      <div class="onboarding-steps">
-        <div class="step-card">
-          <div class="step-num">1</div>
-          <h3>Scan for Opportunities</h3>
-          <p>The bot checks Polymarket for weather contracts (temperature, rain, snow) and pulls NOAA forecasts for the same events to find gaps.</p>
-          <button class="action-btn primary" onclick="switchTab('scan')">Go to Scan</button>
-        </div>
-        <div class="step-card">
-          <div class="step-num">2</div>
-          <h3>Place Practice Bets</h3>
-          <p>When the bot finds a gap between NOAA's forecast and the market price, it places a practice bet with fake money to track performance.</p>
-          <button class="action-btn primary" onclick="switchTab('simulate')">Find &amp; Place Bets</button>
-        </div>
-        <div class="step-card">
-          <div class="step-num">3</div>
-          <h3>Review Results</h3>
-          <p>After weather events happen, resolve your bets to see if they won. Track profit/loss over time to prove the strategy works.</p>
-          <button class="action-btn primary" onclick="switchTab('history')">My Bets</button>
-        </div>
+    <div class="metrics-grid" id="dashMetrics">
+      <div class="metric-card">
+        <div class="metric-label">Portfolio Value</div>
+        <div class="metric-value" id="metricPortfolio">$0.00</div>
+        <div class="metric-sub" id="metricPortfolioSub">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Realized P&L</div>
+        <div class="metric-value" id="metricPnl">$0.00</div>
+        <div class="metric-sub" id="metricPnlSub">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Open Positions</div>
+        <div class="metric-value text-cyan" id="metricOpen">0</div>
+        <div class="metric-sub" id="metricOpenSub">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Win Rate</div>
+        <div class="metric-value" id="metricWinRate">--</div>
+        <div class="metric-sub" id="metricWinRateSub">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Expected P&L</div>
+        <div class="metric-value" id="metricExpected">$0.00</div>
+        <div class="metric-sub">Weighted by NOAA prob</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Total Trades</div>
+        <div class="metric-value text-pink" id="metricTotal">0</div>
+        <div class="metric-sub" id="metricTotalSub">--</div>
       </div>
     </div>
 
-    <!-- Dashboard content (shown when data exists) -->
-    <div id="dashboardContent">
-      <div class="cards-row">
-        <div class="card accent-green">
-          <div class="card-label">Open Bets <span class="tip" data-tip="Bets that have been placed but the weather event hasn't happened yet. Waiting for the outcome.">?</span></div>
-          <div class="card-value" id="cardOpen">--</div>
-          <div class="card-sub" id="cardOpenSub">awaiting weather</div>
-        </div>
-        <div class="card accent-amber clickable" id="cardReadyWrap" onclick="doResolveFromDashboard()">
-          <div class="card-label">Ready to Resolve <span class="tip" data-tip="The weather event already happened for these bets. Click to check outcomes and calculate real P&L.">?</span></div>
-          <div class="card-value" id="cardReady">--</div>
-          <div class="card-sub" style="color:var(--amber)">click to resolve</div>
-        </div>
-        <div class="card accent-blue">
-          <div class="card-label">Resolved <span class="tip" data-tip="Bets that have been settled. We know if they won or lost.">?</span></div>
-          <div class="card-value" id="cardResolved">--</div>
-          <div class="card-sub" id="cardResolvedSub"></div>
-        </div>
-        <div class="card accent-pnl">
-          <div class="card-label">Actual P&amp;L <span class="tip" data-tip="Real profit or loss from resolved bets. This is the number that matters.">?</span></div>
-          <div class="card-value" id="cardActualPnl">--</div>
-          <div class="card-sub" id="cardPnlSub"></div>
-        </div>
-      </div>
-
-      <!-- Next Steps -->
-      <div class="next-steps" id="nextSteps" style="display:none"></div>
-
-      <!-- P&L Chart -->
-      <div class="chart-section">
-        <div class="section-header">
-          <div class="section-title">Portfolio Value</div>
-          <div class="section-controls">
-            <button class="pill-btn" data-range="7">7d</button>
-            <button class="pill-btn active" data-range="30">30d</button>
-            <button class="pill-btn" data-range="60">60d</button>
-          </div>
-        </div>
-        <div class="chart-wrap" id="chartWrap">
-          <canvas id="plChart"></canvas>
-          <div class="chart-crosshair" id="chartCrosshair"></div>
-          <div class="chart-tooltip" id="chartTooltip"></div>
-        </div>
-      </div>
-
-      <!-- Report Stats -->
-      <div class="report-grid" id="reportGrid">
-        <div class="report-stat">
-          <div class="report-stat-label">Avg Edge <span class="tip" data-tip="Average gap between NOAA forecast and market price across all bets.">?</span></div>
-          <div class="report-stat-value" id="reportAvgEdge">--</div>
-        </div>
-        <div class="report-stat">
-          <div class="report-stat-label">Avg Bet Size</div>
-          <div class="report-stat-value" id="reportAvgSize">--</div>
-        </div>
-        <div class="report-stat">
-          <div class="report-stat-label">Actual Wins / Losses</div>
-          <div class="report-stat-value" id="reportActualWL">--</div>
-        </div>
-        <div class="report-stat">
-          <div class="report-stat-label">Actual Win Rate</div>
-          <div class="report-stat-value" id="reportActualWR">--</div>
-        </div>
-      </div>
-
-      <!-- Risk Monitor -->
-      <div class="risk-row">
-        <div class="risk-card">
-          <div class="risk-card-title">Configuration</div>
-          <div class="bar-group" id="configBars"></div>
-        </div>
-        <div class="risk-card">
-          <div class="risk-card-title">Daily Snapshot</div>
-          <div class="gauge-wrap">
-            <svg width="160" height="100" viewBox="0 0 160 100">
-              <path d="M 20 90 A 60 60 0 0 1 140 90" fill="none" stroke="var(--border)" stroke-width="10" stroke-linecap="round"/>
-              <path id="utilizationArc" d="M 20 90 A 60 60 0 0 1 140 90" fill="none" stroke="var(--blue)" stroke-width="10" stroke-linecap="round" stroke-dasharray="0 188.5"/>
-            </svg>
-            <div class="gauge-center">
-              <span class="gauge-value" id="utilizationValue" style="color:var(--text-3)">--</span>
-              <span class="gauge-label" id="utilizationLabel">trades today</span>
-            </div>
-          </div>
-        </div>
-        <div class="risk-card">
-          <div class="risk-card-title">Safety Rails</div>
-          <div id="safetyStatus" style="font-size:0.8rem;color:var(--text-2);line-height:1.8"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: SCAN MARKETS                                   -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-scan">
+    <!-- Equity Curve -->
     <div class="section-header">
-      <div class="section-title">Scan Markets</div>
+      <h2 class="section-title">Equity Curve</h2>
     </div>
-    <p class="tab-description">Scan Polymarket for active weather contracts and compare prices against NOAA forecasts. No bets are placed &mdash; this just finds opportunities.</p>
-    <div class="action-bar">
-      <button class="action-btn primary" id="scanBtn">Scan Markets</button>
+    <div class="equity-canvas-wrap">
+      <canvas id="equityCanvas"></canvas>
     </div>
-    <div class="action-output" id="scanOutput"></div>
-    <div id="scanLastTime" style="font-size:0.7rem;color:var(--text-3);margin-bottom:14px"></div>
 
-    <div class="table-section" id="signalsSection" style="display:none">
-      <div class="section-header">
-        <div class="section-title">Opportunities Found</div>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>The Bet</th>
-            <th>NOAA Says</th>
-            <th>Market Says</th>
-            <th>Our Edge</th>
-            <th>Position</th>
-            <th>Risk &amp; Reward</th>
-          </tr>
-        </thead>
-        <tbody id="signalsBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: SIMULATE                                       -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-simulate">
+    <!-- Safety Rails -->
     <div class="section-header">
-      <div class="section-title">Find &amp; Place Bets</div>
+      <h2 class="section-title">Safety Rails</h2>
     </div>
-    <p class="tab-description">Scan for weather markets where NOAA disagrees with the crowd. Review opportunities, select which to bet on, then confirm.</p>
-    <div class="action-bar">
-      <button class="action-btn primary" id="simFindBtn">Find Opportunities</button>
-      <button class="action-btn amber" id="resolveBtn">Resolve Past Bets</button>
-      <span class="tip" data-tip="Checks actual weather outcomes for past bets and marks them as won or lost with real P&L.">?</span>
-    </div>
-    <div class="action-output" id="simOutput"></div>
-
-    <div class="table-section" id="simSignalsSection" style="display:none">
-      <div class="section-header">
-        <div class="section-title">Opportunities Found</div>
-        <div class="section-controls">
-          <button class="pill-btn" id="selectAllBtn">Select All</button>
-        </div>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width:32px"><input type="checkbox" id="checkAll"></th>
-            <th>The Bet</th>
-            <th>NOAA Says</th>
-            <th>Market Says</th>
-            <th>Our Edge</th>
-            <th>Position</th>
-            <th>Risk &amp; Reward</th>
-          </tr>
-        </thead>
-        <tbody id="simSignalsBody"></tbody>
-      </table>
-    </div>
-
-    <!-- Bet Slip -->
-    <div id="betSlip" style="display:none;position:sticky;bottom:0;z-index:50;background:var(--bg-card);border:1px solid var(--green-border);border-radius:var(--radius);padding:14px 20px;margin-top:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-        <div style="font-size:0.85rem;color:var(--text-1)">
-          <strong id="slipCount">0</strong> bet(s) selected &mdash; <strong id="slipTotal">$0.00</strong> total wagered
-        </div>
-        <button class="action-btn primary" id="placeBetsBtn" style="font-size:0.85rem;padding:10px 24px">Place Bets</button>
+    <div class="card" style="margin-bottom: var(--space-lg);">
+      <div class="safety-grid" id="safetyGrid">
+        <!-- Filled by JS -->
       </div>
     </div>
-  </div>
 
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: MY BETS                                        -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-history">
+    <!-- Recent Activity -->
     <div class="section-header">
-      <div class="section-title">My Bets</div>
-      <div class="section-controls">
-        <select class="filter-select" id="filterStatus">
-          <option value="">All Bets</option>
-          <option value="open">Open</option>
-          <option value="ready">Ready to Resolve</option>
-          <option value="resolved">Resolved</option>
-        </select>
+      <h2 class="section-title">Recent Activity</h2>
+    </div>
+    <div class="card" id="recentActivity">
+      <div class="empty-state">
+        <div class="empty-state-text">No recent activity</div>
       </div>
     </div>
-    <p class="tab-description">Every bet you've placed. Open bets are waiting for weather. Ready bets can be resolved now. Resolved bets show your actual profit or loss.</p>
+  </section>
 
-    <div id="historyLifecycle"></div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: POSITIONS & P&L                                -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-positions">
+  <!-- ============================================================
+       TAB: MARKETS
+       ============================================================ -->
+  <section id="tab-markets" class="tab-panel">
     <div class="section-header">
-      <div class="section-title">Positions &amp; P&amp;L</div>
-      <div class="section-controls">
-        <button class="action-btn" onclick="loadPositions()">Refresh</button>
-      </div>
-    </div>
-    <p class="tab-description">Estimated profit &amp; loss for all open positions. <strong>Expected P&amp;L</strong> is weighted by NOAA forecast probability. <strong>Max Profit</strong> assumes every bet wins.</p>
-
-    <!-- Summary cards -->
-    <div class="cards-row" id="posCards">
-      <div class="card accent-green">
-        <div class="card-label">Open Positions</div>
-        <div class="card-value" id="posCount">--</div>
-      </div>
-      <div class="card accent-blue">
-        <div class="card-label">Total Exposure</div>
-        <div class="card-value" id="posExposure">--</div>
-      </div>
-      <div class="card accent-pnl">
-        <div class="card-label">Expected P&amp;L <span class="tip" data-tip="Probability-weighted estimate. Each position's P&L is weighted by the NOAA forecast probability of winning.">?</span></div>
-        <div class="card-value" id="posExpectedPnl">--</div>
-        <div class="card-sub" id="posExpectedReturn"></div>
-      </div>
-      <div class="card accent-green">
-        <div class="card-label">Max Profit <span class="tip" data-tip="Best-case scenario: every open bet wins and pays out at $1.">?</span></div>
-        <div class="card-value" id="posMaxProfit">--</div>
-        <div class="card-sub" id="posMaxLoss"></div>
+      <h2 class="section-title">Scan for Bets</h2>
+      <div style="display: flex; gap: var(--space-sm); align-items: center;">
+        <button class="btn btn-primary btn-lg" onclick="scanEvents()" id="scanBtn">
+          Scan Markets
+        </button>
       </div>
     </div>
 
-    <!-- Scenario bar -->
-    <div class="table-section" id="posScenarioWrap" style="display:none">
-      <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-3);margin-bottom:10px;font-weight:600">P&amp;L Range</div>
-      <div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;margin-bottom:6px">
-        <span style="color:var(--red);font-weight:600" id="scenarioLoss">--</span>
-        <div style="flex:1;position:relative;height:24px;background:linear-gradient(90deg,var(--red-bg),var(--bg-input) 40%,var(--bg-input) 60%,var(--green-bg));border-radius:12px;border:1px solid var(--border);overflow:hidden">
-          <div id="scenarioMarker" style="position:absolute;top:2px;bottom:2px;width:3px;border-radius:2px;background:var(--blue);transition:left 0.3s"></div>
-        </div>
-        <span style="color:var(--green);font-weight:600" id="scenarioProfit">--</span>
+    <p id="marketsExplainer" style="color: var(--text-secondary); font-size: var(--step--1); margin: 0 0 var(--space-md) 0; max-width: 640px;">
+      Scans Polymarket weather markets, compares prices to NOAA forecasts, and finds bets where the market is mispriced. Only bets with edge above your threshold are shown.
+    </p>
+
+    <div id="marketsContent">
+      <div class="empty-state">
+        <div class="empty-state-icon">&#127780;</div>
+        <div class="empty-state-text">Click "Scan Markets" to find mispriced bets</div>
       </div>
-      <div style="text-align:center;font-size:0.72rem;color:var(--text-2)" id="scenarioExpected"></div>
     </div>
+  </section>
 
-    <!-- Positions table -->
-    <div class="table-section">
-      <table>
-        <thead>
-          <tr>
-            <th>Market</th>
-            <th>Side</th>
-            <th>Stake</th>
-            <th>Entry</th>
-            <th>NOAA Prob</th>
-            <th>Max Profit</th>
-            <th>Max Loss</th>
-            <th>Expected P&amp;L</th>
-            <th>Event</th>
-          </tr>
-        </thead>
-        <tbody id="posTableBody">
-          <tr class="empty-row"><td colspan="9">Loading...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: ACTIVITY LOG                                   -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-logs">
+  <!-- ============================================================
+       TAB: PORTFOLIO
+       ============================================================ -->
+  <section id="tab-portfolio" class="tab-panel">
     <div class="section-header">
-      <div class="section-title">Activity Log</div>
-      <div class="section-controls">
-        <select class="filter-select" id="logLevelFilter">
-          <option value="">All Levels</option>
-          <option value="info">Info</option>
-          <option value="warning">Warning</option>
-          <option value="error">Error</option>
-        </select>
-        <button class="pill-btn" id="clearLogsBtn">Clear</button>
-        <button class="pill-btn active" id="autoScrollBtn">Auto-scroll</button>
+      <h2 class="section-title">Portfolio</h2>
+      <button class="btn btn-secondary" onclick="loadPortfolio()">Refresh</button>
+    </div>
+
+    <div class="metrics-grid" id="portfolioMetrics">
+      <!-- Filled by JS -->
+    </div>
+
+    <div class="lifecycle-tabs">
+      <button class="lifecycle-tab active" data-lifecycle="open" onclick="switchLifecycle('open')">Open</button>
+      <button class="lifecycle-tab" data-lifecycle="ready" onclick="switchLifecycle('ready')">Ready to Resolve</button>
+      <button class="lifecycle-tab" data-lifecycle="resolved" onclick="switchLifecycle('resolved')">Resolved</button>
+    </div>
+
+    <div id="lifecycle-open" class="lifecycle-panel active">
+      <div id="openPositions" class="loading-spinner"><div class="spinner"></div></div>
+    </div>
+    <div id="lifecycle-ready" class="lifecycle-panel">
+      <div id="readyPositions" class="loading-spinner"><div class="spinner"></div></div>
+    </div>
+    <div id="lifecycle-resolved" class="lifecycle-panel">
+      <div id="resolvedTrades" class="loading-spinner"><div class="spinner"></div></div>
+    </div>
+
+    <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm);">
+      <button class="btn btn-success" onclick="resolveTrades()">Resolve Trades</button>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TAB: ACTIVITY
+       ============================================================ -->
+  <section id="tab-activity" class="tab-panel">
+    <div class="section-header">
+      <h2 class="section-title">Activity Log</h2>
+      <div style="display: flex; align-items: center; gap: var(--space-md);">
+        <label style="font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: var(--space-sm); color: var(--text-secondary);">
+          <input type="checkbox" id="logAutoPoll" checked style="accent-color: var(--accent-primary);"> Auto-refresh
+        </label>
+        <button class="btn btn-secondary btn-sm" onclick="loadLogs()">Refresh</button>
       </div>
     </div>
-    <p class="tab-description">Real-time log of bot activity.</p>
+
     <div class="log-viewer" id="logViewer">
-      <div style="color:var(--text-3);text-align:center;padding:20px">Waiting for activity... Run a scan or simulation to see logs here.</div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: SETTINGS                                       -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-settings">
-    <div class="section-header">
-      <div class="section-title">Settings</div>
-    </div>
-    <p class="tab-description">Configure bet sizing, safety limits, and trading rules. Changes take effect on the next scan.</p>
-
-    <div class="settings-grid">
-      <div>
-        <div class="form-group">
-          <label class="form-label">Max Bankroll ($) <span class="tip" data-tip="Total money available for bets.">?</span></label>
-          <input class="form-input" type="number" id="cfgBankroll" step="50">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Position Cap (%) <span class="tip" data-tip="Maximum size of any single bet as % of bankroll. 5% on $500 = $25 max per bet.">?</span></label>
-          <input class="form-input" type="number" id="cfgPositionCap" step="1">
-          <div class="form-hint">As percentage (e.g. 5 = 5%)</div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Kelly Fraction <span class="tip" data-tip="How aggressively to size bets. 0.25 = conservative quarter-Kelly.">?</span></label>
-          <input class="form-input" type="number" id="cfgKelly" step="0.05">
-          <div class="form-hint">0.25 = quarter-Kelly (recommended)</div>
-        </div>
+      <div class="empty-state">
+        <div class="empty-state-text">Waiting for logs...</div>
       </div>
-      <div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TAB: SETTINGS
+       ============================================================ -->
+  <section id="tab-settings" class="tab-panel">
+    <div class="section-header">
+      <h2 class="section-title">Configuration</h2>
+    </div>
+
+    <div class="card" style="margin-bottom: var(--space-lg);">
+      <div class="settings-grid" id="settingsForm">
         <div class="form-group">
-          <label class="form-label">Min Edge Threshold (%) <span class="tip" data-tip="Minimum gap required before betting. 10% = NOAA must disagree by at least 10 cents.">?</span></label>
-          <input class="form-input" type="number" id="cfgMinEdge" step="1">
-          <div class="form-hint">As percentage (e.g. 10 = 10%)</div>
+          <label class="form-label">Max Bankroll ($)</label>
+          <input class="form-input" type="number" id="setMaxBankroll" step="0.01" min="0">
         </div>
         <div class="form-group">
-          <label class="form-label">Daily Loss Limit (%) <span class="tip" data-tip="Stop trading if losses hit this % of bankroll in a day.">?</span></label>
-          <input class="form-input" type="number" id="cfgDailyLoss" step="1">
-          <div class="form-hint">As percentage (e.g. 5 = 5%)</div>
+          <label class="form-label">Position Cap (%)</label>
+          <input class="form-input" type="number" id="setPositionCap" step="0.01" min="0" max="50">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kelly Fraction</label>
+          <input class="form-input" type="number" id="setKellyFraction" step="0.01" min="0" max="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Min Edge Threshold (%)</label>
+          <input class="form-input" type="number" id="setEdgeThreshold" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Daily Loss Limit (%)</label>
+          <input class="form-input" type="number" id="setDailyLoss" step="0.01" min="0">
         </div>
         <div class="form-group">
           <label class="form-label">Log Level</label>
-          <select class="form-input" id="cfgLogLevel">
-            <option>INFO</option>
-            <option>DEBUG</option>
-            <option>WARNING</option>
-            <option>ERROR</option>
+          <select class="form-input" id="setLogLevel">
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
           </select>
         </div>
       </div>
-    </div>
-
-    <div class="modal-kill-row">
-      <span class="modal-kill-label">Emergency Kill Switch <span class="tip" data-tip="Halts all bot activity instantly.">?</span></span>
-      <label class="kill-toggle">
-        <input type="checkbox" id="settingsKillSwitch">
-        <span class="kill-track"></span>
-        <span class="kill-knob"></span>
-      </label>
-    </div>
-    <button class="save-btn" id="saveSettingsBtn">Save Configuration</button>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!-- TAB: HOW IT WORKS                                   -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <div class="tab-content" id="tab-how">
-    <div class="how-section">
-      <h3>The Strategy</h3>
-      <p>NOAA (National Oceanic and Atmospheric Administration) publishes free weather forecasts that are <strong style="color:var(--green)">85&ndash;90% accurate</strong> at 1&ndash;2 day horizons. Polymarket lets anyone bet on weather outcomes &mdash; but casual bettors often misprice these contracts compared to the freely available government data.</p>
-      <p>This bot exploits that gap: it compares NOAA's probability estimate to the market price. When the difference is large enough (10%+ by default), it places a bet sized conservatively using the Kelly Criterion.</p>
-    </div>
-
-    <div class="how-section">
-      <h3>Step by Step</h3>
-      <div class="flow-diagram">
-        <div class="flow-step"><div class="flow-icon">1</div><div class="flow-label">Find Weather Bets</div><div class="flow-detail">Scan Polymarket for temperature, rain, and snow contracts</div></div>
-        <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step"><div class="flow-icon">2</div><div class="flow-label">Get NOAA Forecast</div><div class="flow-detail">Free government data for the same location and date</div></div>
-        <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step"><div class="flow-icon">3</div><div class="flow-label">Compare Prices</div><div class="flow-detail">If NOAA says 70% but market charges 55&cent;, that's a 15% edge</div></div>
-        <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step"><div class="flow-icon">4</div><div class="flow-label">Size the Bet</div><div class="flow-detail">Quarter-Kelly formula decides how much to wager</div></div>
-        <div class="flow-arrow">&rarr;</div>
-        <div class="flow-step"><div class="flow-icon">5</div><div class="flow-label">Track Results</div><div class="flow-detail">Wait for weather, check if we were right, calculate real P&amp;L</div></div>
+      <div style="margin-top: var(--space-lg);">
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
       </div>
     </div>
 
-    <div class="how-section">
-      <h3>Bet Sizing: Quarter-Kelly</h3>
-      <p>The <strong>Kelly Criterion</strong> determines optimal bet size based on your edge. We use only <strong>25% of what Kelly recommends</strong> to be extra cautious.</p>
-      <p><strong>Example:</strong> NOAA says 70% chance of rain but the market prices it at 55%. That's a 15% edge. On a $500 bankroll, the formula might recommend a $12 bet. No single bet can exceed 5% of bankroll ($25).</p>
+    <!-- How It Works Accordion -->
+    <div class="accordion">
+      <button class="accordion-trigger" onclick="toggleAccordion(this)">
+        <span>How It Works</span>
+        <span class="accordion-arrow">&#9660;</span>
+      </button>
+      <div class="accordion-content">
+        <div class="accordion-inner">
+          <p><strong>1. Scan</strong> &mdash; Polymarket is scanned for active weather markets (temperature, precipitation, snowfall).</p>
+          <p><strong>2. Parse</strong> &mdash; Each market question is parsed to extract location, date, and threshold values.</p>
+          <p><strong>3. Forecast</strong> &mdash; NOAA's National Blend of Models (NBM) provides probabilistic forecasts for the same location + date.</p>
+          <p><strong>4. Compare</strong> &mdash; NOAA probability is compared to the Polymarket price. If the gap exceeds the min edge threshold (default 10%), a signal is generated.</p>
+          <p><strong>5. Size</strong> &mdash; Position size uses quarter-Kelly: <code>f* = 0.25 &times; (p_noaa - p_market) / (1 - p_market)</code></p>
+          <p><strong>6. Execute</strong> &mdash; Paper trade is placed in the simulator and logged to SQLite. No real money is involved.</p>
+          <p><strong>7. Resolve</strong> &mdash; When the event date passes, trades are resolved against Polymarket settlement data or NOAA observations.</p>
+          <br>
+          <p><strong>Safety Rails:</strong> Hard bankroll ceiling, per-position cap (25% default), quarter-Kelly only, minimum 10% edge, daily loss limit (-5%), kill switch.</p>
+        </div>
+      </div>
     </div>
+  </section>
 
-    <div class="how-section">
-      <h3>Safety Rules</h3>
-      <p>These are enforced automatically and cannot be bypassed:</p>
-      <table class="glossary-table">
-        <tr><td style="color:var(--green)">Simulation Only</td><td>No real money is used until performance is proven over 60+ days.</td></tr>
-        <tr><td style="color:var(--green)">Bankroll Cap</td><td>Total capital is capped. Adjustable in Settings.</td></tr>
-        <tr><td style="color:var(--green)">5% Position Cap</td><td>No single bet exceeds 5% of bankroll.</td></tr>
-        <tr><td style="color:var(--green)">Quarter-Kelly</td><td>Bet sizes are always 25% of optimal Kelly.</td></tr>
-        <tr><td style="color:var(--green)">10% Min Edge</td><td>Won't bet unless NOAA disagrees with the market by at least 10%.</td></tr>
-        <tr><td style="color:var(--green)">5% Daily Loss Limit</td><td>If losses hit 5% of bankroll in a day, all betting halts.</td></tr>
-        <tr><td style="color:var(--green)">Log Before Execute</td><td>Every bet is logged before it's recorded as placed.</td></tr>
-        <tr><td style="color:var(--red)">Kill Switch</td><td>Emergency stop that halts everything instantly.</td></tr>
-      </table>
-    </div>
+</div><!-- /.app -->
 
-    <div class="how-section">
-      <h3>Glossary</h3>
-      <table class="glossary-table">
-        <tr><td>Bankroll</td><td>Total money available for bets.</td></tr>
-        <tr><td>Edge</td><td>The gap between NOAA's forecast and the market price. A 15% edge means the market is 15 cents off from what the data says.</td></tr>
-        <tr><td>Kelly Criterion</td><td>Math formula for optimal bet sizing. We use quarter-Kelly (25%) to be safe.</td></tr>
-        <tr><td>Kill Switch</td><td>Emergency stop. When on, no scanning or betting happens.</td></tr>
-        <tr><td>NOAA</td><td>National Oceanic and Atmospheric Administration. US government weather forecasts.</td></tr>
-        <tr><td>Open Bet</td><td>A bet that's been placed but the weather event hasn't happened yet.</td></tr>
-        <tr><td>P&amp;L</td><td>Profit and Loss. Positive = you made money.</td></tr>
-        <tr><td>Polymarket</td><td>A prediction market where people bet on real-world events. Contracts pay $1 if the event happens.</td></tr>
-        <tr><td>Ready to Resolve</td><td>The weather event happened. Click resolve to check if you won or lost.</td></tr>
-        <tr><td>Resolve</td><td>Checking actual weather and marking bets as won or lost with real P&amp;L.</td></tr>
-        <tr><td>Win Rate</td><td>Percentage of resolved bets that were correct. Above 55% with positive P&amp;L = working strategy.</td></tr>
-      </table>
-    </div>
-  </div>
-
+<!-- Bet Slip (hidden - all bets placed via table button) -->
+<div class="bet-slip" id="betSlip" style="display:none;">
+  <div class="bet-slip-header"><span>Bet Slip</span><span class="bet-slip-count" id="betSlipCount">0</span></div>
+  <div class="bet-slip-body" id="betSlipBody"></div>
+  <div class="bet-slip-footer"><button class="btn btn-primary" id="betSlipExec">Place Bets</button></div>
 </div>
 
-<!-- ═══ TRADE DETAIL MODAL ═══ -->
-<div class="modal-overlay" id="tradeModal">
-  <div class="modal" style="position:relative">
-    <button class="modal-close" id="modalClose">&times;</button>
-    <div id="modalContent"></div>
+<!-- Scan Overlay -->
+<div class="scan-overlay" id="scanOverlay">
+  <div class="scan-modal">
+    <div class="spinner"></div>
+    <p id="scanOverlayText">Scanning markets...</p>
   </div>
 </div>
 
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
 <script>
-// ═══════════════════════════════════════
-//  API
-// ═══════════════════════════════════════
+/* ================================================================
+   STATE
+   ================================================================ */
 
-function escapeHtml(str) {
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
-}
+const state = {
+  config: {},
+  portfolio: null,
+  events: [],
+  signals: [],
+  betSlipSelections: new Map(), // key: "eventId:bucketIndex" -> signal data
+  logCursor: 0,
+  logPollTimer: null,
+  activeTab: 'dashboard',
+};
 
-async function api(method, path, body) {
+/* ================================================================
+   UTILITIES
+   ================================================================ */
+
+function $(id) { return document.getElementById(id); }
+
+async function api(method, path, body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
   if (!res.ok) {
-    let msg = res.statusText;
-    try { const j = await res.json(); msg = j.error || msg; } catch {}
-    throw new Error(msg);
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
   }
   return res.json();
 }
 
-// ═══════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════
+function fmt$(v) {
+  const n = Number(v) || 0;
+  return (n >= 0 ? '' : '-') + '$' + Math.abs(n).toFixed(2);
+}
 
-let statusData = {};
-let portfolioData = {};
-let reportData = {};
-let tradesData = [];
-let snapshotsData = [];
-let signalsData = [];
-let simSignalsData = [];
-let positionsData = { positions: [], summary: {} };
-let currentRange = 30;
-let logCursor = 0;
-let logAutoScroll = true;
-let logEntries = [];
+function fmtPct(v) {
+  return (Number(v) * 100).toFixed(1) + '%';
+}
 
-// ═══════════════════════════════════════
-//  TAB SWITCHING
-// ═══════════════════════════════════════
+function fmtPctPts(v) {
+  return (Number(v) * 100).toFixed(1) + 'pp';
+}
+
+function fmtDate(d) {
+  if (!d) return '--';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch { return ts; }
+}
+
+function fmtMetric(m) {
+  const map = {
+    'temperature_high': 'High Temp',
+    'temperature_low': 'Low Temp',
+    'precipitation': 'Precip',
+    'snowfall': 'Snow',
+  };
+  return map[m] || m;
+}
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function escHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+/* ================================================================
+   TOAST
+   ================================================================ */
+
+function toast(message, type = 'info') {
+  const container = $('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(40px)';
+    el.style.transition = 'all 300ms';
+    setTimeout(() => el.remove(), 300);
+  }, 3500);
+}
+
+/* ================================================================
+   THEME
+   ================================================================ */
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  $('themeIcon').innerHTML = isDark ? '&#9790;' : '&#9728;';
+  localStorage.setItem('theme', isDark ? 'light' : 'dark');
+}
+
+(function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    setTimeout(() => { $('themeIcon').innerHTML = '&#9728;'; }, 0);
+  }
+})();
+
+/* ================================================================
+   TABS
+   ================================================================ */
 
 function switchTab(tabId) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
-  const content = document.getElementById('tab-' + tabId);
-  if (btn) btn.classList.add('active');
-  if (content) content.classList.add('active');
-  if (tabId === 'dashboard') drawChart();
+  state.activeTab = tabId;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tabId}`));
+
+  // Load data on tab switch
+  if (tabId === 'dashboard') loadDashboard();
+  if (tabId === 'portfolio') loadPortfolio();
+  if (tabId === 'activity') { loadLogs(); startLogPolling(); }
+  if (tabId === 'settings') loadSettings();
+  if (tabId !== 'activity') stopLogPolling();
 }
 
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-});
+/* ================================================================
+   LIFECYCLE TABS (Portfolio)
+   ================================================================ */
 
-// ═══════════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════════
-
-function formatMetric(metric) {
-  const map = { temperature_high: 'High Temp', temperature_low: 'Low Temp', precipitation: 'Precipitation', snowfall: 'Snowfall' };
-  return map[metric] || metric;
+function switchLifecycle(which) {
+  document.querySelectorAll('.lifecycle-tab').forEach(b => b.classList.toggle('active', b.dataset.lifecycle === which));
+  document.querySelectorAll('.lifecycle-panel').forEach(p => p.classList.toggle('active', p.id === `lifecycle-${which}`));
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return '';
+/* ================================================================
+   ACCORDION
+   ================================================================ */
+
+function toggleAccordion(trigger) {
+  trigger.classList.toggle('open');
+  const content = trigger.nextElementSibling;
+  content.classList.toggle('open');
+}
+
+/* ================================================================
+   KILL SWITCH
+   ================================================================ */
+
+async function toggleKillSwitch(enabled) {
   try {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch { return dateStr; }
-}
-
-function formatThreshold(threshold, metric) {
-  if (threshold == null) return '?';
-  if (metric && (metric.startsWith('temperature') || metric === 'temperature_high' || metric === 'temperature_low')) {
-    return threshold + '\u00b0F';
+    const data = await api('PUT', '/api/kill-switch', { enabled });
+    updateStatusUI(data);
+    toast(enabled ? 'Kill switch ENGAGED' : 'Kill switch disengaged', enabled ? 'error' : 'success');
+  } catch (e) {
+    toast('Failed to toggle kill switch: ' + e.message, 'error');
+    $('killSwitch').checked = !enabled;
   }
-  if (metric === 'precipitation' || metric === 'snowfall') return threshold + ' in';
-  return String(threshold);
 }
 
-function makeBetDescription(s) {
-  if (s.question && s.question.length > 10) return s.question;
-  const loc = s.location || '?';
-  const metric = formatMetric(s.metric || '');
-  const threshold = formatThreshold(s.threshold, s.metric);
-  const eventDate = s.event_date ? formatDate(s.event_date) : '';
-  return `${loc} ${metric} ${s.comparison || 'above'} ${threshold}${eventDate ? ' on ' + eventDate : ''}`;
-}
-
-function countdownText(daysUntil) {
-  if (daysUntil == null) return '';
-  if (daysUntil > 1) return `resolves in ${daysUntil}d`;
-  if (daysUntil === 1) return 'resolves tomorrow';
-  if (daysUntil === 0) return 'resolves today';
-  if (daysUntil === -1) return 'resolved yesterday';
-  return `resolved ${Math.abs(daysUntil)}d ago`;
-}
-
-// ═══════════════════════════════════════
-//  LOAD DATA
-// ═══════════════════════════════════════
-
-async function loadAll() {
-  await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades(), loadSnapshots(), loadPositions()]);
-  renderReport(); // Re-render after snapshots are loaded (fixes race condition)
-  updateOnboarding();
-}
+/* ================================================================
+   STATUS & CONFIG
+   ================================================================ */
 
 async function loadStatus() {
   try {
-    statusData = await api('GET', '/api/status');
-    renderStatus();
-  } catch (e) { console.error('status load failed', e); }
+    const data = await api('GET', '/api/status');
+    state.config = data;
+    updateStatusUI(data);
+    return data;
+  } catch (e) {
+    toast('Failed to load status', 'error');
+  }
 }
 
-async function loadPortfolio() {
-  try {
-    portfolioData = await api('GET', '/api/portfolio');
-    renderPortfolio();
-  } catch (e) { console.error('portfolio load failed', e); }
-}
+function updateStatusUI(data) {
+  state.config = data;
 
-async function loadReport() {
-  try {
-    reportData = await api('GET', '/api/report?days=90');
-    renderReport();
-  } catch (e) { console.error('report load failed', e); }
-}
-
-async function loadTrades() {
-  try {
-    const data = await api('GET', '/api/trades?days=365');
-    tradesData = data.trades || [];
-    renderHistory();
-  } catch (e) { console.error('trades load failed', e); }
-}
-
-async function loadSnapshots() {
-  try {
-    const data = await api('GET', '/api/snapshots?days=60');
-    snapshotsData = data.snapshots || [];
-    drawChart();
-  } catch (e) { console.error('snapshots load failed', e); }
-}
-
-// ═══════════════════════════════════════
-//  ONBOARDING
-// ═══════════════════════════════════════
-
-function updateOnboarding() {
-  const hasData = tradesData.length > 0 || snapshotsData.length > 0;
-  document.getElementById('onboarding').style.display = hasData ? 'none' : 'block';
-  document.getElementById('dashboardContent').style.display = hasData ? 'block' : 'none';
-}
-
-// ═══════════════════════════════════════
-//  RENDER STATUS
-// ═══════════════════════════════════════
-
-function renderStatus() {
-  const s = statusData;
-  const badge = document.getElementById('statusBadge');
-  const text = document.getElementById('statusText');
-  const kill = document.getElementById('killSwitch');
-  const settingsKill = document.getElementById('settingsKillSwitch');
-
-  if (s.kill_switch) {
-    badge.classList.add('halted');
-    text.textContent = 'Halted';
-    kill.checked = true;
-    settingsKill.checked = true;
+  // Kill switch
+  $('killSwitch').checked = data.kill_switch;
+  const badge = $('statusBadge');
+  const statusText = $('statusText');
+  if (data.kill_switch) {
+    badge.className = 'status-badge halted';
+    statusText.textContent = 'HALTED';
   } else {
-    badge.classList.remove('halted');
-    text.textContent = 'Paper Sim';
-    kill.checked = false;
-    settingsKill.checked = false;
+    badge.className = 'status-badge live';
+    statusText.textContent = 'LIVE';
   }
 
-  // Settings form — skip if user is editing
-  const settingsGrid = document.querySelector('.settings-grid');
-  const formHasFocus = settingsGrid && settingsGrid.contains(document.activeElement);
-  if (!formHasFocus) {
-    document.getElementById('cfgBankroll').value = s.max_bankroll || 500;
-    document.getElementById('cfgPositionCap').value = ((s.position_cap_pct || 0.05) * 100).toFixed(0);
-    document.getElementById('cfgKelly').value = s.kelly_fraction || 0.25;
-    document.getElementById('cfgMinEdge').value = ((s.min_edge_threshold || 0.1) * 100).toFixed(0);
-    document.getElementById('cfgDailyLoss').value = ((s.daily_loss_limit_pct || 0.05) * 100).toFixed(0);
-    document.getElementById('cfgLogLevel').value = s.log_level || 'INFO';
+  // Topbar stats
+  $('topBankroll').textContent = fmt$(data.max_bankroll);
+  $('topOpen').textContent = data.open_bets || 0;
+}
+
+/* ================================================================
+   DASHBOARD
+   ================================================================ */
+
+async function loadDashboard() {
+  await loadStatus();
+  loadPortfolioMetrics();
+  loadEquityCurve();
+  loadSafetyRails();
+  loadRecentActivity();
+}
+
+async function loadPortfolioMetrics() {
+  try {
+    const data = await api('GET', '/api/portfolio');
+    state.portfolio = data;
+
+    // Map API fields to display
+    const cash = Number(data.cash ?? data.available_bankroll ?? 0);
+    const exposure = Number(data.exposure ?? data.total_invested ?? 0);
+    const totalValue = Number(data.total_value ?? data.starting_bankroll ?? 0);
+    const maxBankroll = Number(data.starting_bankroll ?? data.max_bankroll ?? 0);
+    const openCount = Number(data.open ?? data.open_positions ?? 0);
+    const resolvedCount = Number(data.resolved ?? 0);
+    const pnl = Number(data.actual_pnl ?? data.realized_pnl ?? 0);
+    const wins = Number(data.wins ?? 0);
+    const losses = Number(data.losses ?? 0);
+
+    $('metricPortfolio').textContent = fmt$(totalValue);
+    $('metricPortfolioSub').textContent = `${fmt$(cash)} cash, ${fmt$(exposure)} invested`;
+
+    $('metricPnl').textContent = fmt$(pnl);
+    $('metricPnl').className = `metric-value ${pnl >= 0 ? 'text-green' : 'text-red'}`;
+    $('metricPnlSub').textContent = `${wins}W / ${losses}L`;
+
+    $('metricOpen').textContent = openCount;
+    $('metricOpenSub').textContent = `${fmt$(exposure)} invested`;
+
+    const total = wins + losses;
+    if (total > 0) {
+      const wr = ((wins / total) * 100).toFixed(0) + '%';
+      $('metricWinRate').textContent = wr;
+      $('metricWinRate').className = `metric-value ${wins / total >= 0.5 ? 'text-green' : 'text-gold'}`;
+      $('metricWinRateSub').textContent = `${total} resolved`;
+    } else {
+      $('metricWinRate').textContent = '--';
+      $('metricWinRate').className = 'metric-value';
+      $('metricWinRateSub').textContent = 'No resolved trades';
+    }
+
+    const expected = Number(data.estimated_expected_pnl ?? 0);
+    $('metricExpected').textContent = fmt$(expected);
+    $('metricExpected').className = `metric-value ${expected >= 0 ? 'text-green' : 'text-red'}`;
+
+    const totalTrades = Number(data.total ?? data.total_trades ?? 0);
+    $('metricTotal').textContent = totalTrades;
+    $('metricTotalSub').textContent = `${openCount} open, ${resolvedCount} resolved`;
+
+    // Update topbar
+    $('topPnl').textContent = fmt$(pnl);
+    $('topBankroll').textContent = fmt$(cash);
+    $('topOpen').textContent = openCount;
+    $('topPnl').className = `topbar-stat-value ${pnl >= 0 ? 'text-green' : 'text-red'}`;
+  } catch (e) {
+    console.error('Portfolio metrics error:', e);
+  }
+}
+
+/* ── Equity Curve (Canvas) ── */
+
+async function loadEquityCurve() {
+  try {
+    const data = await api('GET', '/api/snapshots?days=90');
+    const snapshots = data.snapshots || [];
+    if (snapshots.length < 2) {
+      const canvas = $('equityCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth * 2;
+      canvas.height = 520;
+      ctx.scale(2, 2);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
+      ctx.font = '600 14px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Not enough data for equity curve', canvas.offsetWidth / 2, 130);
+      return;
+    }
+    drawEquityCurve(snapshots);
+  } catch (e) {
+    console.error('Equity curve error:', e);
+  }
+}
+
+function drawEquityCurve(snapshots) {
+  const canvas = $('equityCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.offsetWidth;
+  const h = 260;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const cs = getComputedStyle(document.documentElement);
+  const textMuted = cs.getPropertyValue('--text-muted').trim() || 'oklch(0.54 0.01 70)';
+  const textPrimary = cs.getPropertyValue('--text-primary').trim() || 'oklch(0.20 0.015 60)';
+  const accentPrimary = cs.getPropertyValue('--accent-primary').trim() || 'oklch(0.64 0.27 350)';
+  const accentGreen = cs.getPropertyValue('--accent-green').trim() || 'oklch(0.63 0.17 148)';
+  const bgMuted = cs.getPropertyValue('--bg-muted').trim() || 'oklch(0.948 0.014 70)';
+
+  const pad = { top: 20, right: 20, bottom: 40, left: 70 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  const values = snapshots.map(s => Number(s.portfolio_value || s.total_value || 0));
+  const dates = snapshots.map(s => s.snapshot_date || s.date);
+  const minV = Math.min(...values) * 0.98;
+  const maxV = Math.max(...values) * 1.02;
+  const range = maxV - minV || 1;
+
+  function xPos(i) { return pad.left + (i / (values.length - 1)) * cw; }
+  function yPos(v) { return pad.top + ch - ((v - minV) / range) * ch; }
+
+  // Grid lines
+  ctx.strokeStyle = bgMuted;
+  ctx.lineWidth = 1;
+  const gridSteps = 5;
+  for (let i = 0; i <= gridSteps; i++) {
+    const y = pad.top + (ch / gridSteps) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+
+    const val = maxV - (i / gridSteps) * range;
+    ctx.fillStyle = textMuted;
+    ctx.font = '500 11px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(fmt$(val), pad.left - 8, y + 4);
   }
 
-  // Config bars
-  const bars = document.getElementById('configBars');
-  bars.innerHTML = [
-    { label: 'Max Bankroll', val: '$' + (s.max_bankroll || 0).toFixed(0) },
-    { label: 'Position Cap', val: ((s.position_cap_pct || 0) * 100).toFixed(0) + '%' },
-    { label: 'Kelly Fraction', val: (s.kelly_fraction || 0).toFixed(2) },
-    { label: 'Min Edge', val: ((s.min_edge_threshold || 0) * 100).toFixed(0) + '%' },
-    { label: 'Daily Loss Limit', val: ((s.daily_loss_limit_pct || 0) * 100).toFixed(0) + '%' },
-  ].map(c => `<div class="bar-item-label"><span>${c.label}</span><span>${c.val}</span></div>`).join('');
+  // Date labels
+  ctx.textAlign = 'center';
+  const labelCount = Math.min(dates.length, 6);
+  for (let i = 0; i < labelCount; i++) {
+    const idx = Math.round((i / (labelCount - 1)) * (dates.length - 1));
+    const x = xPos(idx);
+    ctx.fillStyle = textMuted;
+    ctx.font = '500 10px JetBrains Mono, monospace';
+    ctx.fillText(fmtDate(dates[idx]).replace(/, \d{4}/, ''), x, h - 8);
+  }
 
-  // Safety
-  const safety = document.getElementById('safetyStatus');
-  safety.innerHTML = `
-    Kill Switch: <span style="color:var(${s.kill_switch ? '--red' : '--green'})">${s.kill_switch ? 'ENGAGED' : 'OFF'}</span><br>
-    Log Level: <span style="color:var(--text-1)">${s.log_level}</span><br>
-    Open Bets: <span style="color:var(--text-1)">${s.open_bets || 0}</span> |
-    Ready: <span style="color:var(--amber)">${s.ready_to_resolve || 0}</span>
+  // Fill area
+  ctx.beginPath();
+  ctx.moveTo(xPos(0), yPos(values[0]));
+  for (let i = 1; i < values.length; i++) {
+    ctx.lineTo(xPos(i), yPos(values[i]));
+  }
+  ctx.lineTo(xPos(values.length - 1), pad.top + ch);
+  ctx.lineTo(xPos(0), pad.top + ch);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+  const lastVal = values[values.length - 1];
+  const firstVal = values[0];
+  const lineColor = lastVal >= firstVal ? accentGreen : accentPrimary;
+  grad.addColorStop(0, lineColor + '30');
+  grad.addColorStop(1, lineColor + '05');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(xPos(0), yPos(values[0]));
+  for (let i = 1; i < values.length; i++) {
+    ctx.lineTo(xPos(i), yPos(values[i]));
+  }
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // End dot
+  const lastX = xPos(values.length - 1);
+  const lastY = yPos(lastVal);
+  ctx.beginPath();
+  ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+  ctx.strokeStyle = textPrimary;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+/* ── Safety Rails ── */
+
+function loadSafetyRails() {
+  const cfg = state.config;
+  const p = state.portfolio || {};
+  const rails = [
+    {
+      label: 'Simulation Only',
+      value: 'Paper trading',
+      status: 'ok',
+    },
+    {
+      label: 'Bankroll Ceiling',
+      value: fmt$(cfg.max_bankroll || 0),
+      status: 'ok',
+    },
+    {
+      label: 'Position Cap',
+      value: `${((cfg.position_cap_pct || 0.25) * 100).toFixed(0)}% of bankroll`,
+      status: 'ok',
+    },
+    {
+      label: 'Quarter-Kelly',
+      value: `Fraction: ${cfg.kelly_fraction || 0.25}`,
+      status: 'ok',
+    },
+    {
+      label: 'Min Edge',
+      value: `${((cfg.min_edge_threshold || 0.10) * 100).toFixed(0)}pp threshold`,
+      status: 'ok',
+    },
+    {
+      label: 'Daily Loss Limit',
+      value: `-${((cfg.daily_loss_limit_pct || 0.05) * 100).toFixed(0)}%`,
+      status: 'ok',
+    },
+    {
+      label: 'Kill Switch',
+      value: cfg.kill_switch ? 'ENGAGED' : 'Disengaged',
+      status: cfg.kill_switch ? 'error' : 'ok',
+    },
+    {
+      label: 'Log-Before-Execute',
+      value: 'Active',
+      status: 'ok',
+    },
+  ];
+
+  const iconMap = { ok: '&#10003;', warn: '!', error: '&#10005;' };
+  const grid = $('safetyGrid');
+  grid.innerHTML = rails.map(r => `
+    <div class="safety-item safety-${r.status}">
+      <div class="safety-icon">${iconMap[r.status]}</div>
+      <div>
+        <div class="safety-text-label">${r.label}</div>
+        <div class="safety-text-value">${r.value}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ── Recent Activity (Dashboard) ── */
+
+async function loadRecentActivity() {
+  try {
+    const data = await api('GET', '/api/logs?since=0');
+    const logs = (data.logs || []).slice(-8).reverse();
+    const el = $('recentActivity');
+
+    if (logs.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-text">No recent activity</div></div>';
+      return;
+    }
+
+    el.innerHTML = logs.map(l => {
+      const level = (l.level || 'info').toLowerCase();
+      const colorMap = { info: 'var(--accent-cyan)', warning: 'var(--accent-gold)', error: 'var(--accent-danger)', debug: 'var(--text-muted)' };
+      return `
+        <div class="activity-item">
+          <div class="activity-dot" style="background: ${colorMap[level] || colorMap.info};"></div>
+          <div class="activity-text">${escHtml(l.event || '')}</div>
+          <div class="activity-time">${fmtTime(l.timestamp)}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.error('Recent activity error:', e);
+  }
+}
+
+/* ================================================================
+   MARKETS TAB
+   ================================================================ */
+
+async function scanEvents() {
+  const overlay = $('scanOverlay');
+  overlay.classList.add('active');
+  $('scanOverlayText').textContent = 'Scanning weather markets...';
+
+  try {
+    const data = await api('POST', '/api/events/scan');
+    state.events = data.events || [];
+    state.signals = data.signals || [];
+    state.betSlipSelections.clear();
+    updateBetSlipUI();
+
+    renderEvents();
+    toast(`Found ${state.events.length} event(s) with ${state.signals.length} signal(s)`, 'success');
+  } catch (e) {
+    toast('Scan failed: ' + e.message, 'error');
+
+    // Fallback to legacy scan
+    try {
+      $('scanOverlayText').textContent = 'Trying legacy scan...';
+      const legacy = await api('POST', '/api/scan');
+      renderLegacySignals(legacy.signals || []);
+      toast(`Legacy scan: ${(legacy.signals || []).length} signal(s)`, 'info');
+    } catch (e2) {
+      toast('Legacy scan also failed: ' + e2.message, 'error');
+    }
+  } finally {
+    overlay.classList.remove('active');
+  }
+}
+
+function renderEvents() {
+  const container = $('marketsContent');
+
+  // Flatten signals into a single list of actionable bets
+  const bets = state.signals.filter(s =>
+    Math.abs(Number(s.edge || 0)) >= (Number(state.config.min_edge_threshold) || 0.10)
+  );
+
+  if (bets.length === 0 && state.events.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">&#127780;</div>
+        <div class="empty-state-text">No weather events found</div>
+      </div>
+    `;
+    return;
+  }
+
+  if (bets.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">&#9989;</div>
+        <div class="empty-state-text">Scanned ${state.events.length} event(s) — no mispriced bets found right now</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Build event lookup for context
+  const eventLookup = {};
+  for (const e of state.events) { eventLookup[e.event_id] = e; }
+
+  // Sort by absolute edge descending (best bets first)
+  bets.sort((a, b) => Math.abs(Number(b.edge || 0)) - Math.abs(Number(a.edge || 0)));
+
+  const totalSize = bets.reduce((sum, s) => sum + Number(s.recommended_size || 0), 0);
+  const totalProfit = bets.reduce((sum, s) => {
+    const side = (s.side || (Number(s.edge || 0) > 0 ? 'YES' : 'NO')).toUpperCase();
+    const mkt = Number(s.market_price || 0);
+    const size = Number(s.recommended_size || 0);
+    const buyPrice = side === 'YES' ? mkt : (1 - mkt);
+    return sum + (buyPrice > 0 ? size * (1 - buyPrice) / buyPrice : 0);
+  }, 0);
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">${bets.length} Mispriced Bet${bets.length > 1 ? 's' : ''} Found</h3>
+        <div style="display:flex; gap: var(--space-sm);">
+          <span class="badge badge-pink">Stake: $${totalSize.toFixed(2)}</span>
+          <span class="badge badge-green">If all win: +$${totalProfit.toFixed(2)}</span>
+        </div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="bets-table">
+          <thead>
+            <tr>
+              <th>Bet</th>
+              <th>Location</th>
+              <th>Date</th>
+              <th>Side</th>
+              <th class="num">NOAA</th>
+              <th class="num">Market</th>
+              <th class="num">Edge</th>
+              <th class="num">Stake</th>
+              <th class="num">If Win</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bets.map(s => {
+              const ev = eventLookup[s.event_id] || {};
+              const edge = Number(s.edge || 0);
+              const edgeCls = edge > 0 ? 'text-green' : 'text-red';
+              const side = (s.side || (edge > 0 ? 'YES' : 'NO')).toUpperCase();
+              const sideCls = side === 'YES' ? 'badge-green' : 'badge-danger';
+              const label = s.outcome_label || s.question || ev.question || s.market_id || '';
+              const shortLabel = formatBetLabel(label, ev.metric);
+              const noaa = Number(s.noaa_probability || 0);
+              const mkt = Number(s.market_price || 0);
+              const size = Number(s.recommended_size || 0);
+              // Potential profit if bet wins
+              const buyPrice = side === 'YES' ? mkt : (1 - mkt);
+              const profit = buyPrice > 0 ? size * (1 - buyPrice) / buyPrice : 0;
+              return `
+                <tr>
+                  <td><span class="bet-label" title="${escHtml(label)}">${escHtml(shortLabel)}</span></td>
+                  <td>${escHtml(ev.location || s.location || '')}</td>
+                  <td>${fmtDate(ev.event_date || s.event_date || '')}</td>
+                  <td><span class="badge ${sideCls}">${side}</span></td>
+                  <td class="num">${(noaa * 100).toFixed(0)}%</td>
+                  <td class="num">${(mkt * 100).toFixed(0)}\u00A2</td>
+                  <td class="num ${edgeCls}">${edge > 0 ? '+' : ''}${(edge * 100).toFixed(1)}pp</td>
+                  <td class="num">$${size.toFixed(2)}</td>
+                  <td class="num text-green">+$${profit.toFixed(2)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="padding: var(--space-md) var(--space-lg); border-top: var(--border-width) solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <div style="color: var(--text-secondary); font-size: var(--step--1);">
+          Risk <strong>$${totalSize.toFixed(2)}</strong> to win up to <strong class="text-green">+$${totalProfit.toFixed(2)}</strong> across ${bets.length} bet${bets.length > 1 ? 's' : ''}
+        </div>
+        <button class="btn btn-primary btn-lg" onclick="executeAllBets()">
+          Place All Bets ($${totalSize.toFixed(2)})
+        </button>
+      </div>
+    </div>
   `;
 }
 
-// ═══════════════════════════════════════
-//  RENDER PORTFOLIO
-// ═══════════════════════════════════════
+function formatBetLabel(label, metric) {
+  const unit = (metric || '').includes('precip') ? '"' : '\u00B0F';
 
-function renderPortfolio() {
-  const p = portfolioData;
+  // "48-49" or "48 - 49" or "48–49"
+  const rangeMatch = label.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)/);
+  if (rangeMatch) return `${rangeMatch[1]}\u2013${rangeMatch[2]}${unit}`;
 
-  // Topbar
-  const totalVal = p.total_value || p.starting_bankroll || 0;
-  document.getElementById('topBankroll').textContent = '$' + totalVal.toFixed(0);
-  const cash = p.cash || 0;
-  const exposure = p.exposure || 0;
-  document.getElementById('topCashExposure').textContent = `$${cash.toFixed(0)} free / $${exposure.toFixed(0)} at risk`;
+  // "47°F or below", "47 degrees or lower", etc
+  const belowMatch = label.match(/(\d+\.?\d*)\s*(?:°\s*F?\s*|degrees?\s*(?:F(?:ahrenheit)?)?\s*)?(?:or\s+)?(?:below|under|less|lower)/i);
+  if (belowMatch) return `\u2264 ${belowMatch[1]}${unit}`;
 
-  const openCount = p.open || 0;
-  const readyCount = p.ready || 0;
-  const betsEl = document.getElementById('topBets');
-  const parts = [];
-  if (openCount) parts.push(openCount + ' open');
-  if (readyCount) parts.push(readyCount + ' ready');
-  betsEl.textContent = parts.length ? parts.join(' / ') : '0';
-  if (readyCount > 0) betsEl.style.color = 'var(--amber)';
-  else betsEl.style.color = '';
+  // "55°F or above", "55 degrees or more", etc
+  const aboveMatch = label.match(/(\d+\.?\d*)\s*(?:°\s*F?\s*|degrees?\s*(?:F(?:ahrenheit)?)?\s*)?(?:or\s+)?(?:above|over|more|higher)/i);
+  if (aboveMatch) return `\u2265 ${aboveMatch[1]}${unit}`;
 
-  // Dashboard cards
-  document.getElementById('cardOpen').textContent = openCount;
-  document.getElementById('cardReady').textContent = readyCount;
-  document.getElementById('cardResolved').textContent = p.resolved || 0;
-
-  const actPnl = p.actual_pnl || 0;
-  const actEl = document.getElementById('cardActualPnl');
-  actEl.textContent = (actPnl >= 0 ? '+' : '') + '$' + actPnl.toFixed(2);
-  actEl.className = 'card-value ' + (actPnl >= 0 ? 'positive' : 'negative');
-
-  // Show expected P&L from open positions on the P&L card
-  const expectedPnl = p.estimated_expected_pnl || 0;
-  const pnlSub = document.getElementById('cardPnlSub');
-  if (openCount > 0 && expectedPnl !== 0) {
-    const sign = expectedPnl >= 0 ? '+' : '';
-    pnlSub.innerHTML = `Open: <span style="color:${expectedPnl >= 0 ? 'var(--green)' : 'var(--red)'}">${sign}$${expectedPnl.toFixed(2)}</span> expected`;
-  } else {
-    pnlSub.textContent = '';
+  // Grab text after "be" — "Will the highest temp ... be 48-49 degrees"
+  const afterBe = label.match(/\bbe\s+(.+)/i);
+  if (afterBe) {
+    const tail = afterBe[1].replace(/\s*\?$/, '').replace(/degrees?\s*(fahrenheit|f)?/gi, unit).trim();
+    return tail.length > 25 ? tail.slice(0, 23) + '\u2026' : tail;
   }
 
-  // Show expected P&L on the Open Bets card
-  const openSub = document.getElementById('cardOpenSub');
-  if (openCount > 0 && expectedPnl !== 0) {
-    const sign = expectedPnl >= 0 ? '+' : '';
-    openSub.innerHTML = `${sign}$${expectedPnl.toFixed(2)} expected P&amp;L`;
-    openSub.style.color = expectedPnl >= 0 ? 'var(--green)' : 'var(--red)';
-  } else {
-    openSub.textContent = 'awaiting weather';
-    openSub.style.color = '';
-  }
-
-  // Find earliest open event date for next steps
-  renderNextSteps(openCount, readyCount, p.resolved || 0);
+  return label.length > 25 ? label.slice(0, 23) + '\u2026' : label;
 }
 
-function renderNextSteps(openCount, readyCount, resolvedCount) {
-  const el = document.getElementById('nextSteps');
-  if (readyCount > 0) {
-    el.style.display = 'flex';
-    el.innerHTML = `
-      <span class="next-steps-icon" style="color:var(--amber)">&#9888;</span>
-      <span class="next-steps-text"><strong>${readyCount} bet${readyCount > 1 ? 's are' : ' is'} ready to resolve.</strong> The weather happened &mdash; click to check if you won.</span>
-      <button class="action-btn amber" onclick="doResolveFromDashboard()">Resolve Now</button>
-    `;
-  } else if (openCount > 0) {
-    const earliest = tradesData.filter(t => t.lifecycle === 'open' && t.event_date).sort((a, b) => a.event_date.localeCompare(b.event_date))[0];
-    const dateStr = earliest ? earliest.event_date : 'soon';
-    el.style.display = 'flex';
-    el.innerHTML = `
-      <span class="next-steps-icon" style="color:var(--green)">&#9203;</span>
-      <span class="next-steps-text"><strong>${openCount} bet${openCount > 1 ? 's' : ''} open.</strong> Next weather event: ${dateStr}. Come back after to resolve.</span>
-    `;
-  } else if (resolvedCount > 0) {
-    el.style.display = 'flex';
-    el.innerHTML = `
-      <span class="next-steps-icon" style="color:var(--blue)">&#10003;</span>
-      <span class="next-steps-text"><strong>All bets settled.</strong> Find new opportunities to keep testing.</span>
-      <button class="action-btn primary" onclick="switchTab('simulate')">Find &amp; Place Bets</button>
-    `;
-  } else {
-    el.style.display = 'none';
+function renderLegacySignals(signals) {
+  const container = $('marketsContent');
+  if (signals.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#127780;</div><div class="empty-state-text">No signals found (legacy scan)</div></div>';
+    return;
   }
+
+  container.innerHTML = `
+    <div class="card" style="margin-bottom: var(--space-lg);">
+      <div class="card-header">
+        <h3 class="card-title">Legacy Binary Signals</h3>
+        <span class="badge badge-gold">Legacy</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Market</th>
+              <th>Side</th>
+              <th>NOAA</th>
+              <th>Market</th>
+              <th>Edge</th>
+              <th>Size</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${signals.map(s => `
+              <tr>
+                <td style="font-family: var(--font-sans); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(s.question || s.market_id || '')}</td>
+                <td><span class="badge ${s.side === 'YES' ? 'badge-green' : 'badge-red'}">${s.side}</span></td>
+                <td>${fmtPct(s.noaa_probability)}</td>
+                <td>${fmtPct(s.market_price)}</td>
+                <td class="${Number(s.edge) > 0 ? 'text-green' : 'text-red'}">${fmtPctPts(s.edge)}</td>
+                <td>${fmt$(s.recommended_size)}</td>
+                <td><span class="badge badge-muted">${s.confidence}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
-async function doResolveFromDashboard() {
-  const btn = document.querySelector('#nextSteps .action-btn') || document.getElementById('cardReadyWrap');
-  if (btn) setLoading(btn, true);
+/* ================================================================
+   BET SLIP
+   ================================================================ */
+
+function toggleBetSlipItem() { /* no-op, kept for compat */ }
+function updateBetSlipUI() { /* no-op, kept for compat */ }
+
+async function executeBetSlip() { await executeAllBets(); }
+
+async function executeAllBets() {
+  // Execute all signals the bot found — no manual selection needed
+  const bets = state.signals.filter(s =>
+    Math.abs(Number(s.edge || 0)) >= (Number(state.config.min_edge_threshold) || 0.10)
+  );
+  if (bets.length === 0) { toast('No bets to place', 'info'); return; }
+
+  // Build selections: group by event_id → bucket_indices
+  const byEvent = {};
+  for (const s of bets) {
+    if (!byEvent[s.event_id]) byEvent[s.event_id] = [];
+    byEvent[s.event_id].push(s.bucket_index);
+  }
+  const selections = Object.entries(byEvent).map(([event_id, bucket_indices]) => ({ event_id, bucket_indices }));
+
+  // Disable button
+  const btn = document.querySelector('#marketsContent .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Placing...'; }
+
   try {
-    const data = await api('POST', '/api/resolve');
-    if (data.error) {
-      console.error('resolve error', data.error);
+    const data = await api('POST', '/api/events/execute', { selections });
+    const trades = data.trades || [];
+    toast(`Placed ${trades.length} paper bet(s)!`, 'success');
+
+    if (data.skipped > 0) {
+      const reasons = data.skip_reasons || [];
+      const reasonTexts = reasons.map(r => typeof r === 'string' ? r : (r.reason || 'unknown'));
+      const unique = [...new Set(reasonTexts)];
+      toast(`Skipped ${data.skipped}: ${unique.join(', ') || 'limit reached'}`, 'info');
+    }
+
+    // Refresh
+    loadStatus();
+    scanEvents();
+  } catch (e) {
+    toast('Execution failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Place All Bets'; }
+  }
+}
+
+/* ================================================================
+   PORTFOLIO TAB
+   ================================================================ */
+
+async function loadPortfolio() {
+  loadPortfolioSummary();
+  loadOpenPositions();
+  loadReadyPositions();
+  loadResolvedTrades();
+}
+
+async function loadPortfolioSummary() {
+  try {
+    const data = await api('GET', '/api/portfolio');
+    state.portfolio = data;
+
+    const grid = $('portfolioMetrics');
+    grid.innerHTML = `
+      <div class="metric-card">
+        <div class="metric-label">Available Bankroll</div>
+        <div class="metric-value">${fmt$(data.available_bankroll)}</div>
+        <div class="metric-sub">of ${fmt$(data.max_bankroll)} max</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Total Invested</div>
+        <div class="metric-value text-cyan">${fmt$(data.total_invested)}</div>
+        <div class="metric-sub">${data.open_positions || 0} positions</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Realized P&L</div>
+        <div class="metric-value ${Number(data.realized_pnl) >= 0 ? 'text-green' : 'text-red'}">${fmt$(data.realized_pnl)}</div>
+        <div class="metric-sub">${data.wins || 0}W / ${data.losses || 0}L</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Max Profit (est.)</div>
+        <div class="metric-value text-green">${fmt$(data.estimated_max_profit || 0)}</div>
+        <div class="metric-sub">If all open bets win</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Max Loss (est.)</div>
+        <div class="metric-value text-red">${fmt$(data.estimated_max_loss || 0)}</div>
+        <div class="metric-sub">If all open bets lose</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Expected P&L</div>
+        <div class="metric-value ${Number(data.estimated_expected_pnl || 0) >= 0 ? 'text-green' : 'text-red'}">${fmt$(data.estimated_expected_pnl || 0)}</div>
+        <div class="metric-sub">NOAA-weighted</div>
+      </div>
+    `;
+  } catch (e) {
+    console.error('Portfolio summary error:', e);
+  }
+}
+
+async function loadOpenPositions() {
+  const el = $('openPositions');
+  try {
+    const data = await api('GET', '/api/positions');
+    const positions = data.positions || [];
+
+    if (positions.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-text">No open positions</div></div>';
       return;
     }
-    await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades()]);
+
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Market</th>
+              <th>Side</th>
+              <th>Price</th>
+              <th>Size</th>
+              <th>NOAA Prob</th>
+              <th>Max Profit</th>
+              <th>Max Loss</th>
+              <th>Expected</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${positions.map(p => `
+              <tr>
+                <td style="font-family: var(--font-sans); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(p.question || p.market_id || '--')}</td>
+                <td><span class="badge ${p.side === 'YES' ? 'badge-green' : 'badge-red'}">${p.side}</span></td>
+                <td>${fmtPct(p.price)}</td>
+                <td>${fmt$(p.size)}</td>
+                <td>${p.noaa_probability ? fmtPct(p.noaa_probability) : '--'}</td>
+                <td class="text-green">${fmt$(p.max_profit || 0)}</td>
+                <td class="text-red">${fmt$(p.max_loss || 0)}</td>
+                <td class="${Number(p.expected_pnl || 0) >= 0 ? 'text-green' : 'text-red'}">${fmt$(p.expected_pnl || 0)}</td>
+                <td>${fmtDate(p.created_at || p.timestamp)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   } catch (e) {
-    console.error('resolve failed', e);
-  } finally {
-    if (btn) setLoading(btn, false);
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-text">Failed to load positions</div></div>';
   }
 }
 
-// ═══════════════════════════════════════
-//  RENDER REPORT
-// ═══════════════════════════════════════
-
-function renderReport() {
-  const r = reportData;
-
-  // Resolved sub info
-  const resolvedSub = document.getElementById('cardResolvedSub');
-  if (r.actual_wins || r.actual_losses) {
-    resolvedSub.textContent = (r.actual_wins || 0) + ' won / ' + (r.actual_losses || 0) + ' lost';
-  }
-
-  const pnlSub = document.getElementById('cardPnlSub');
-  if ((r.actual_wins || 0) + (r.actual_losses || 0) > 0) {
-    pnlSub.textContent = 'Win rate: ' + ((r.actual_win_rate || 0) * 100).toFixed(0) + '%';
-  }
-
-  document.getElementById('reportAvgEdge').textContent = ((r.avg_edge || 0) * 100).toFixed(1) + '%';
-  document.getElementById('reportAvgSize').textContent = '$' + (r.avg_size || 0).toFixed(2);
-  document.getElementById('reportActualWL').textContent = (r.actual_wins || 0) + 'W / ' + (r.actual_losses || 0) + 'L';
-  document.getElementById('reportActualWR').textContent = ((r.actual_win_rate || 0) * 100).toFixed(0) + '%';
-
-  const tradesToday = snapshotsData.length > 0 ? snapshotsData[snapshotsData.length - 1].trades_today : 0;
-  document.getElementById('utilizationValue').textContent = tradesToday;
-  document.getElementById('utilizationValue').style.color = 'var(--blue)';
-
-  const arcLen = Math.PI * 60;
-  const pct = Math.min(1, (r.filled_trades || 0) / Math.max(1, 50));
-  const arc = document.getElementById('utilizationArc');
-  arc.setAttribute('stroke-dasharray', `${pct * arcLen} ${arcLen}`);
-}
-
-// ═══════════════════════════════════════
-//  RENDER SIGNALS (human-readable)
-// ═══════════════════════════════════════
-
-function renderSignalRows(signals, tbodyId, sectionId, withCheckbox) {
-  const section = document.getElementById(sectionId);
-  const tbody = document.getElementById(tbodyId);
-  if (!signals.length) { section.style.display = 'none'; return; }
-  section.style.display = '';
-  tbody.innerHTML = signals.map(s => {
-    const desc = makeBetDescription(s);
-    const noaaPct = (Math.abs(s.noaa_probability || 0) * 100).toFixed(0);
-    const marketPct = (Math.abs(s.market_price || 0) * 100).toFixed(0);
-    const edgePct = (Math.abs(s.edge || 0) * 100).toFixed(0);
-    const edgeClass = Math.abs(s.edge) >= 0.15 ? 'edge-strong' : 'edge-marginal';
-    const sideLabel = s.side === 'YES' ? 'Yes, it will' : 'No, it won\'t';
-    const sideClass = s.side === 'YES' ? 'badge-yes' : 'badge-no';
-    const risk = (s.recommended_size || 0).toFixed(2);
-    const payout = (s.potential_payout || ((1 - (s.market_price || 0)) * (s.recommended_size || 0))).toFixed(2);
-    const cb = withCheckbox ? `<td><input type="checkbox" class="signal-check" data-market-id="${s.market_id}" data-size="${s.recommended_size || 0}" checked></td>` : '';
-    return `<tr>
-      ${cb}
-      <td style="color:var(--text-1);max-width:340px;overflow:hidden;text-overflow:ellipsis" title="${desc}">${desc}</td>
-      <td style="color:var(--green)">${noaaPct}% likely</td>
-      <td>${marketPct}% likely</td>
-      <td class="${edgeClass}">${edgePct}%</td>
-      <td><span class="badge ${sideClass}">${sideLabel}</span></td>
-      <td style="color:var(--text-1)">$${risk} <span style="color:var(--green)">&rarr; win $${payout}</span></td>
-    </tr>`;
-  }).join('');
-  if (withCheckbox) updateBetSlip();
-}
-
-// ═══════════════════════════════════════
-//  RENDER MY BETS (lifecycle grouped)
-// ═══════════════════════════════════════
-
-function renderHistory() {
-  const container = document.getElementById('historyLifecycle');
-  const filter = document.getElementById('filterStatus').value;
-
-  const open = tradesData.filter(t => t.lifecycle === 'open');
-  const ready = tradesData.filter(t => t.lifecycle === 'ready');
-  const resolved = tradesData.filter(t => t.lifecycle === 'resolved');
-
-  let html = '';
-
-  // Open Bets
-  if (!filter || filter === 'open') {
-    html += `<div class="lifecycle-section">
-      <div class="lifecycle-header open">
-        <h3>Open Bets</h3>
-        <span class="lifecycle-count">${open.length}</span>
-      </div>`;
-    if (open.length === 0) {
-      html += '<div class="lifecycle-empty">No open bets. Place some bets to get started.</div>';
-    } else {
-      html += open.map(t => renderBetCard(t, 'open')).join('');
-    }
-    html += '</div>';
-  }
-
-  // Ready to Resolve
-  if (!filter || filter === 'ready') {
-    html += `<div class="lifecycle-section">
-      <div class="lifecycle-header ready" style="justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:12px">
-          <h3>Ready to Resolve</h3>
-          <span class="lifecycle-count">${ready.length}</span>
-        </div>
-        ${ready.length > 0 ? '<button class="action-btn amber" style="font-size:0.72rem;padding:4px 14px" onclick="doResolveFromDashboard()">Resolve All</button>' : ''}
-      </div>`;
-    if (ready.length === 0) {
-      html += '<div class="lifecycle-empty">No bets ready to resolve yet. Weather events need to happen first.</div>';
-    } else {
-      html += ready.map(t => renderBetCard(t, 'ready')).join('');
-    }
-    html += '</div>';
-  }
-
-  // Resolved
-  if (!filter || filter === 'resolved') {
-    html += `<div class="lifecycle-section">
-      <div class="lifecycle-header resolved">
-        <h3>Resolved</h3>
-        <span class="lifecycle-count">${resolved.length}</span>
-      </div>`;
-    if (resolved.length === 0) {
-      html += '<div class="lifecycle-empty">No resolved bets yet. Resolve ready bets to see results.</div>';
-    } else {
-      html += '<div class="table-section"><table><thead><tr><th>The Bet</th><th>Position</th><th>Bet Size</th><th>Actual Weather</th><th>Result</th><th>Profit/Loss</th></tr></thead><tbody>';
-      html += resolved.map(t => {
-        const desc = t.question || t.location || t.market_id;
-        const sideClass = t.side === 'YES' ? 'badge-yes' : 'badge-no';
-        const outcomeClass = t.outcome === 'won' ? 'badge-won' : 'badge-lost';
-        const pnl = t.actual_pnl != null ? t.actual_pnl : 0;
-        const actualStr = t.actual_value != null ? `${t.actual_value.toFixed(1)}${t.actual_value_unit || ''}` : '--';
-        return `<tr onclick="openTradeModal('${t.trade_id}')">
-          <td style="color:var(--text-1);max-width:300px;overflow:hidden;text-overflow:ellipsis">${desc}</td>
-          <td><span class="badge ${sideClass}">${t.side === 'YES' ? 'Yes' : 'No'}</span></td>
-          <td>$${(t.size || 0).toFixed(2)}</td>
-          <td>${actualStr}</td>
-          <td><span class="badge ${outcomeClass}">${t.outcome || '?'}</span></td>
-          <td><span class="${pnl >= 0 ? 'val-pos' : 'val-neg'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span></td>
-        </tr>`;
-      }).join('');
-      html += '</tbody></table></div>';
-    }
-    html += '</div>';
-  }
-
-  container.innerHTML = html;
-}
-
-function renderBetCard(t, type) {
-  const desc = t.question || t.location || t.market_id;
-  const sideLabel = t.side === 'YES' ? 'Yes' : 'No';
-  const sideClass = t.side === 'YES' ? 'badge-yes' : 'badge-no';
-  const size = (t.size || 0).toFixed(2);
-  const payout = (t.potential_payout || 0).toFixed(2);
-  const cd = countdownText(t.days_until_event);
-  const cdClass = type === 'ready' ? 'countdown-ready' : 'countdown-future';
-  const metaItems = [t.location || '', t.event_date ? formatDate(t.event_date) : ''].filter(Boolean);
-
-  return `<div class="bet-card" onclick="openTradeModal('${t.trade_id}')">
-    <span class="badge ${sideClass}" style="flex-shrink:0">${sideLabel}</span>
-    <div class="bet-card-main">
-      <div class="bet-card-desc">${desc}</div>
-      <div class="bet-card-meta">${metaItems.map(m => `<span>${m}</span>`).join('')}</div>
-    </div>
-    <div class="bet-card-money">
-      <div class="bet-card-stake">$${size}</div>
-      <div class="bet-card-payout">win up to $${payout}</div>
-    </div>
-    ${cd ? `<span class="bet-card-countdown ${cdClass}">${cd}</span>` : ''}
-  </div>`;
-}
-
-// ═══════════════════════════════════════
-//  TRADE DETAIL MODAL
-// ═══════════════════════════════════════
-
-async function openTradeModal(tradeId) {
-  const overlay = document.getElementById('tradeModal');
-  const content = document.getElementById('modalContent');
-  content.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px">Loading...</div>';
-  overlay.classList.add('open');
-
+async function loadReadyPositions() {
+  const el = $('readyPositions');
   try {
-    const t = await api('GET', '/api/trades/' + tradeId);
-    if (t.error) { content.innerHTML = `<div style="color:var(--red)">${t.error}</div>`; return; }
+    const data = await api('GET', '/api/trades?status=ready&days=365');
+    const trades = data.trades || [];
 
-    const desc = t.question || t.location || t.market_id;
-    const sideLabel = t.side === 'YES' ? 'Yes, it will happen' : 'No, it won\'t happen';
-    const cd = countdownText(t.days_until_event);
-
-    let lifecycleBadge = '';
-    if (t.lifecycle === 'open') lifecycleBadge = '<span class="badge badge-open">Open</span>';
-    else if (t.lifecycle === 'ready') lifecycleBadge = '<span class="badge badge-ready">Ready to Resolve</span>';
-    else if (t.lifecycle === 'resolved') lifecycleBadge = t.outcome === 'won' ? '<span class="badge badge-won">Won</span>' : '<span class="badge badge-lost">Lost</span>';
-
-    let html = `<div class="modal-title">${desc}</div>`;
-    html += `<div style="margin-bottom:16px">${lifecycleBadge} ${cd ? `<span style="color:var(--text-3);font-size:0.75rem;margin-left:8px">${cd}</span>` : ''}</div>`;
-
-    html += '<div class="modal-section-label">Bet Details</div>';
-    html += `<div class="modal-row"><span class="modal-row-label">Position</span><span class="modal-row-value">${sideLabel}</span></div>`;
-    html += `<div class="modal-row"><span class="modal-row-label">Bet Size</span><span class="modal-row-value">$${(t.size || 0).toFixed(2)}</span></div>`;
-    html += `<div class="modal-row"><span class="modal-row-label">Entry Price</span><span class="modal-row-value">$${(t.price || 0).toFixed(2)}</span></div>`;
-    html += `<div class="modal-row"><span class="modal-row-label">Potential Payout</span><span class="modal-row-value" style="color:var(--green)">$${(t.potential_payout || 0).toFixed(2)}</span></div>`;
-
-    html += '<div class="modal-section-label">The Edge</div>';
-    html += `<div class="modal-row"><span class="modal-row-label">NOAA Says</span><span class="modal-row-value" style="color:var(--green)">${((t.noaa_probability || 0) * 100).toFixed(0)}% likely</span></div>`;
-    const marketProb = t.side === 'YES' ? (t.price || 0) : 1 - (t.price || 0);
-    html += `<div class="modal-row"><span class="modal-row-label">Market Says</span><span class="modal-row-value">${(marketProb * 100).toFixed(0)}% likely</span></div>`;
-    html += `<div class="modal-row"><span class="modal-row-label">Our Edge</span><span class="modal-row-value" style="color:var(--green)">${((t.edge || 0) * 100).toFixed(0)}%</span></div>`;
-
-    html += '<div class="modal-section-label">Timeline</div>';
-    const placedDate = t.timestamp ? new Date(t.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
-    html += `<div class="modal-row"><span class="modal-row-label">Bet Placed</span><span class="modal-row-value">${placedDate}</span></div>`;
-    html += `<div class="modal-row"><span class="modal-row-label">Weather Event</span><span class="modal-row-value">${t.event_date ? formatDate(t.event_date) : 'Unknown'}</span></div>`;
-
-    // NOAA Forecast at bet time
-    if (t.noaa_forecast_high != null || t.noaa_forecast_low != null || t.noaa_forecast_narrative) {
-      html += '<div class="modal-section-label">NOAA Forecast at Bet Time</div>';
-      if (t.noaa_forecast_high != null) html += `<div class="modal-row"><span class="modal-row-label">Forecast High</span><span class="modal-row-value">${t.noaa_forecast_high.toFixed(0)}\u00b0F</span></div>`;
-      if (t.noaa_forecast_low != null) html += `<div class="modal-row"><span class="modal-row-label">Forecast Low</span><span class="modal-row-value">${t.noaa_forecast_low.toFixed(0)}\u00b0F</span></div>`;
-      if (t.noaa_forecast_narrative) html += `<div class="modal-row"><span class="modal-row-label">Forecast</span><span class="modal-row-value" style="max-width:280px;white-space:normal;text-align:right;line-height:1.4">${escapeHtml(t.noaa_forecast_narrative)}</span></div>`;
+    if (trades.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-text">No trades ready to resolve</div></div>';
+      return;
     }
 
-    if (t.lifecycle === 'resolved') {
-      html += '<div class="modal-section-label">Result</div>';
-      const pnl = t.actual_pnl || 0;
-      html += `<div class="modal-row"><span class="modal-row-label">Outcome</span><span class="modal-row-value">${t.outcome === 'won' ? '<span style="color:var(--green)">WON</span>' : '<span style="color:var(--red)">LOST</span>'}</span></div>`;
-      if (t.actual_value != null) {
-        const unit = t.actual_value_unit || '';
-        const thr = formatThreshold(t.threshold, t.metric);
-        html += `<div class="modal-row"><span class="modal-row-label">Actual Weather</span><span class="modal-row-value">${t.actual_value.toFixed(1)}${unit} vs ${thr} threshold</span></div>`;
-      }
-      html += `<div class="modal-row"><span class="modal-row-label">Actual P&L</span><span class="modal-row-value ${pnl >= 0 ? 'val-pos' : 'val-neg'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span></div>`;
-    }
-
-    content.innerHTML = html;
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Market</th>
+              <th>Side</th>
+              <th>Price</th>
+              <th>Size</th>
+              <th>Traded</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${trades.map(t => `
+              <tr>
+                <td style="font-family: var(--font-sans); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(t.question || t.market_id || '--')}</td>
+                <td><span class="badge ${t.side === 'YES' ? 'badge-green' : 'badge-red'}">${t.side}</span></td>
+                <td>${fmtPct(t.price)}</td>
+                <td>${fmt$(t.size)}</td>
+                <td>${fmtDate(t.created_at || t.timestamp)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   } catch (e) {
-    content.innerHTML = `<div style="color:var(--red)">Failed to load trade details.</div>`;
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-text">Failed to load ready trades</div></div>';
   }
 }
 
-document.getElementById('modalClose').addEventListener('click', () => {
-  document.getElementById('tradeModal').classList.remove('open');
-});
-document.getElementById('tradeModal').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
-});
-
-// ═══════════════════════════════════════
-//  CHART
-// ═══════════════════════════════════════
-
-function getChartData() {
-  if (!snapshotsData.length) return [];
-  const sliced = currentRange === 'all' ? snapshotsData : snapshotsData.slice(-currentRange);
-  return sliced.map(s => ({
-    date: new Date(s.snapshot_date),
-    value: parseFloat(s.total_value),
-  }));
-}
-
-function drawChart() {
-  const canvas = document.getElementById('plChart');
-  const wrap = document.getElementById('chartWrap');
-  const dpr = window.devicePixelRatio || 1;
-  const rect = wrap.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  const w = rect.width;
-  const h = rect.height;
-
-  const data = getChartData();
-  if (!data.length) {
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#505370';
-    ctx.font = '13px JetBrains Mono';
-    ctx.textAlign = 'center';
-    ctx.fillText('No snapshot data yet. Run simulations to populate.', w / 2, h / 2);
-    return;
-  }
-
-  const pad = { top: 10, right: 16, bottom: 28, left: 56 };
-  const values = data.map(d => d.value);
-  const minV = Math.floor(Math.min(...values) / 5) * 5 - 5;
-  const maxV = Math.ceil(Math.max(...values) / 5) * 5 + 5;
-  const chartW = w - pad.left - pad.right;
-  const chartH = h - pad.top - pad.bottom;
-
-  function xPos(i) { return pad.left + (i / Math.max(1, data.length - 1)) * chartW; }
-  function yPos(v) { return pad.top + (1 - (v - minV) / (maxV - minV)) * chartH; }
-
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.strokeStyle = 'rgba(30,32,46,0.6)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  for (let i = 0; i <= 5; i++) {
-    const v = minV + (maxV - minV) * (i / 5);
-    const y = yPos(v);
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
-    ctx.fillStyle = '#505370'; ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'right';
-    ctx.fillText('$' + Math.round(v), pad.left - 8, y + 3);
-  }
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = '#505370'; ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'center';
-  const labelEvery = Math.max(1, Math.floor(data.length / 6));
-  for (let i = 0; i < data.length; i += labelEvery) {
-    const d = data[i].date;
-    ctx.fillText((d.getMonth() + 1) + '/' + d.getDate(), xPos(i), h - 6);
-  }
-
-  ctx.beginPath();
-  ctx.moveTo(xPos(0), yPos(values[0]));
-  for (let i = 1; i < data.length; i++) {
-    const x0 = xPos(i - 1), y0 = yPos(values[i - 1]);
-    const x1 = xPos(i), y1 = yPos(values[i]);
-    ctx.bezierCurveTo((x0 + x1) / 2, y0, (x0 + x1) / 2, y1, x1, y1);
-  }
-  ctx.strokeStyle = '#4d8eff'; ctx.lineWidth = 2; ctx.stroke();
-
-  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-  grad.addColorStop(0, 'rgba(77,142,255,0.15)');
-  grad.addColorStop(1, 'rgba(77,142,255,0)');
-  ctx.beginPath();
-  ctx.moveTo(xPos(0), yPos(values[0]));
-  for (let i = 1; i < data.length; i++) {
-    const x0 = xPos(i - 1), y0 = yPos(values[i - 1]);
-    const x1 = xPos(i), y1 = yPos(values[i]);
-    ctx.bezierCurveTo((x0 + x1) / 2, y0, (x0 + x1) / 2, y1, x1, y1);
-  }
-  ctx.lineTo(xPos(data.length - 1), pad.top + chartH);
-  ctx.lineTo(xPos(0), pad.top + chartH);
-  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
-
-  canvas._chartMeta = { data, pad, chartW, chartH, minV, maxV, xPos, yPos, w, h };
-}
-
-function setupChartHover() {
-  const canvas = document.getElementById('plChart');
-  const tooltip = document.getElementById('chartTooltip');
-  const crosshair = document.getElementById('chartCrosshair');
-  canvas.addEventListener('mousemove', e => {
-    const meta = canvas._chartMeta;
-    if (!meta || !meta.data.length) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    if (mx < meta.pad.left || mx > meta.w - meta.pad.right) {
-      tooltip.classList.remove('visible'); crosshair.classList.remove('visible'); return;
-    }
-    const ratio = (mx - meta.pad.left) / meta.chartW;
-    const idx = Math.max(0, Math.min(meta.data.length - 1, Math.round(ratio * (meta.data.length - 1))));
-    const pt = meta.data[idx];
-    const x = meta.xPos(idx);
-    tooltip.innerHTML = `<div style="color:var(--text-3);margin-bottom:2px">${pt.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div><div style="font-weight:600;color:var(--blue)">$${pt.value.toFixed(2)}</div>`;
-    tooltip.style.left = (x + 12) + 'px';
-    tooltip.style.top = (meta.yPos(pt.value) - 20) + 'px';
-    tooltip.classList.add('visible');
-    crosshair.style.left = x + 'px';
-    crosshair.classList.add('visible');
-  });
-  canvas.addEventListener('mouseleave', () => {
-    tooltip.classList.remove('visible'); crosshair.classList.remove('visible');
-  });
-}
-
-// ═══════════════════════════════════════
-//  ACTION HELPERS
-// ═══════════════════════════════════════
-
-function showOutput(id, html) {
-  const el = document.getElementById(id);
-  el.innerHTML = html;
-  el.classList.add('visible');
-}
-
-function hideOutput(id) {
-  document.getElementById(id).classList.remove('visible');
-}
-
-function setLoading(btn, loading) {
-  btn.disabled = loading;
-  if (loading) btn.classList.add('loading');
-  else btn.classList.remove('loading');
-}
-
-// ═══════════════════════════════════════
-//  ACTIONS: SCAN
-// ═══════════════════════════════════════
-
-document.getElementById('scanBtn').addEventListener('click', async function() {
-  setLoading(this, true);
-  hideOutput('scanOutput');
+async function loadResolvedTrades() {
+  const el = $('resolvedTrades');
   try {
-    const data = await api('POST', '/api/scan');
-    if (data.error) {
-      showOutput('scanOutput', `<span class="error">Scan failed: ${data.error}</span>`);
-    } else {
-      signalsData = data.signals || [];
-      localStorage.setItem('lastScanSignals', JSON.stringify(signalsData));
-      localStorage.setItem('lastScanTime', new Date().toISOString());
-      renderSignalRows(signalsData, 'signalsBody', 'signalsSection', false);
-      updateScanTime();
-      showOutput('scanOutput', `<span class="success">Scan complete.</span> Found <span class="info">${data.count}</span> opportunities.`);
+    const data = await api('GET', '/api/trades?status=resolved&days=365');
+    const trades = data.trades || [];
+
+    if (trades.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-text">No resolved trades yet</div></div>';
+      return;
     }
+
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Market</th>
+              <th>Side</th>
+              <th>Price</th>
+              <th>Size</th>
+              <th>Outcome</th>
+              <th>P&L</th>
+              <th>Resolved</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${trades.map(t => {
+              const pnl = Number(t.pnl || 0);
+              const won = t.outcome === 'win';
+              return `
+                <tr>
+                  <td style="font-family: var(--font-sans); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(t.question || t.market_id || '--')}</td>
+                  <td><span class="badge ${t.side === 'YES' ? 'badge-green' : 'badge-red'}">${t.side}</span></td>
+                  <td>${fmtPct(t.price)}</td>
+                  <td>${fmt$(t.size)}</td>
+                  <td><span class="badge ${won ? 'badge-green' : 'badge-red'}">${t.outcome || '--'}</span></td>
+                  <td class="${pnl >= 0 ? 'text-green' : 'text-red'}">${fmt$(pnl)}</td>
+                  <td>${fmtDate(t.resolved_at)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   } catch (e) {
-    showOutput('scanOutput', `<span class="error">Scan failed: ${e.message}</span>`);
-  }
-  setLoading(this, false);
-});
-
-function updateScanTime() {
-  const t = localStorage.getItem('lastScanTime');
-  const el = document.getElementById('scanLastTime');
-  if (t) {
-    const d = new Date(t);
-    el.textContent = 'Last scan: ' + d.toLocaleString();
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-text">Failed to load resolved trades</div></div>';
   }
 }
 
-// ═══════════════════════════════════════
-//  ACTIONS: SIMULATE
-// ═══════════════════════════════════════
-
-// Step 1: Find opportunities (scan only, no execution)
-document.getElementById('simFindBtn').addEventListener('click', async function() {
-  setLoading(this, true);
-  hideOutput('simOutput');
-  document.getElementById('betSlip').style.display = 'none';
+async function resolveTrades() {
   try {
-    const data = await api('POST', '/api/scan');
-    if (data.error) {
-      showOutput('simOutput', `<span class="error">Scan failed: ${data.error}</span>`);
-    } else {
-      simSignalsData = data.signals || [];
-      if (!simSignalsData.length) {
-        showOutput('simOutput', `<span class="info">No actionable opportunities found right now.</span>`);
-        document.getElementById('simSignalsSection').style.display = 'none';
-      } else {
-        renderSignalRows(simSignalsData, 'simSignalsBody', 'simSignalsSection', true);
-        showOutput('simOutput', `<span class="success">Found ${simSignalsData.length} opportunities.</span> Select which bets to place, then click "Place Bets".`);
-      }
-    }
-  } catch (e) {
-    showOutput('simOutput', `<span class="error">Scan failed: ${e.message}</span>`);
-  }
-  setLoading(this, false);
-});
-
-// Bet slip: update counts when checkboxes change
-function updateBetSlip() {
-  const checks = document.querySelectorAll('.signal-check:checked');
-  const slip = document.getElementById('betSlip');
-  if (checks.length === 0) { slip.style.display = 'none'; return; }
-  slip.style.display = 'block';
-  let total = 0;
-  checks.forEach(c => { total += parseFloat(c.dataset.size || 0); });
-  document.getElementById('slipCount').textContent = checks.length;
-  document.getElementById('slipTotal').textContent = '$' + total.toFixed(2);
-}
-
-document.addEventListener('change', e => {
-  if (e.target.classList.contains('signal-check') || e.target.id === 'checkAll') {
-    if (e.target.id === 'checkAll') {
-      document.querySelectorAll('.signal-check').forEach(c => { c.checked = e.target.checked; });
-    } else {
-      // Update checkAll state when individual checkbox changes
-      const all = document.querySelectorAll('.signal-check');
-      const checkAllEl = document.getElementById('checkAll');
-      if (checkAllEl) checkAllEl.checked = [...all].every(c => c.checked);
-    }
-    updateBetSlip();
-  }
-});
-
-document.getElementById('selectAllBtn').addEventListener('click', () => {
-  const checks = document.querySelectorAll('.signal-check');
-  const allChecked = [...checks].every(c => c.checked);
-  checks.forEach(c => { c.checked = !allChecked; });
-  document.getElementById('checkAll').checked = !allChecked;
-  updateBetSlip();
-});
-
-// Step 2: Place selected bets
-document.getElementById('placeBetsBtn').addEventListener('click', async function() {
-  const checks = document.querySelectorAll('.signal-check:checked');
-  if (!checks.length) return;
-  const marketIds = [...checks].map(c => c.dataset.marketId);
-  setLoading(this, true);
-  try {
-    const data = await api('POST', '/api/sim/execute', { market_ids: marketIds });
-    if (data.error) {
-      showOutput('simOutput', `<span class="error">Failed: ${data.error}</span>`);
-    } else {
-      const trades = data.trades || [];
-      const totalWagered = trades.reduce((sum, t) => sum + (t.size || 0), 0);
-      let msg = `<span class="success">Placed ${trades.length} bet${trades.length !== 1 ? 's' : ''} totaling $${totalWagered.toFixed(2)}.</span>`;
-      if (data.skipped > 0) msg += ` <span style="color:var(--text-3)">(${data.skipped} skipped)</span>`;
-      const reasons = data.skip_reasons || [];
-      if (reasons.length) {
-        msg += '\n<span style="color:var(--text-3);font-size:0.85em">';
-        reasons.forEach(r => { msg += `\n&bull; ${r.reason}`; });
-        msg += '</span>';
-      }
-      showOutput('simOutput', msg);
-      document.getElementById('betSlip').style.display = 'none';
-      document.getElementById('simSignalsSection').style.display = 'none';
-      await Promise.all([loadPortfolio(), loadReport(), loadTrades(), loadSnapshots()]);
-      updateOnboarding();
-    }
-  } catch (e) {
-    showOutput('simOutput', `<span class="error">Failed: ${e.message}</span>`);
-  }
-  setLoading(this, false);
-});
-
-// ═══════════════════════════════════════
-//  ACTIONS: RESOLVE
-// ═══════════════════════════════════════
-
-document.getElementById('resolveBtn').addEventListener('click', async function() {
-  setLoading(this, true);
-  hideOutput('simOutput');
-  try {
+    toast('Resolving trades...', 'info');
     const data = await api('POST', '/api/resolve');
-    if (data.error) {
-      showOutput('simOutput', `<span class="error">Resolution failed: ${data.error}</span>`);
-    } else {
-      let msg = `<span class="success">Resolution complete.</span>\n`;
-      msg += `Resolved: <span class="info">${data.resolved_count}</span>`;
-      if (data.resolved_count > 0) {
-        msg += ` | Won: <span class="success">${data.wins}</span> | Lost: <span class="error">${data.losses}</span>`;
-        msg += ` | P&L: <span class="${data.total_pnl >= 0 ? 'success' : 'error'}">$${(data.total_pnl || 0).toFixed(2)}</span>`;
-      }
-      if (data.skipped_future > 0) {
-        msg += `\n<span style="color:var(--text-3)">${data.skipped_future} bet(s) skipped &mdash; weather hasn't happened yet.</span>`;
-      }
-      showOutput('simOutput', msg);
-      await Promise.all([loadStatus(), loadPortfolio(), loadReport(), loadTrades()]);
+    const resolved = data.resolved || 0;
+    toast(`Resolved ${resolved} trade(s)`, resolved > 0 ? 'success' : 'info');
+    loadPortfolio();
+    loadDashboard();
+  } catch (e) {
+    toast('Resolve failed: ' + e.message, 'error');
+  }
+}
+
+/* ================================================================
+   ACTIVITY LOG
+   ================================================================ */
+
+async function loadLogs() {
+  try {
+    const data = await api('GET', `/api/logs?since=${state.logCursor}`);
+    const logs = data.logs || [];
+    state.logCursor = data.cursor || state.logCursor;
+
+    if (logs.length === 0 && state.logCursor === 0) return;
+
+    const viewer = $('logViewer');
+
+    // If this is the first load or refresh, clear
+    if (logs.length > 0 && viewer.querySelector('.empty-state')) {
+      viewer.innerHTML = '';
+    }
+
+    // Append new logs
+    for (const l of logs) {
+      const level = (l.level || 'info').toLowerCase();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <span class="log-ts">${l.timestamp || ''}</span>
+        <span class="log-level ${level}">${level}</span>
+        <span class="log-msg">${escHtml(l.event || '')}${buildLogExtra(l)}</span>
+      `;
+      viewer.appendChild(entry);
+    }
+
+    // Auto-scroll to bottom
+    if (logs.length > 0) {
+      viewer.scrollTop = viewer.scrollHeight;
     }
   } catch (e) {
-    showOutput('simOutput', `<span class="error">Resolution failed: ${e.message}</span>`);
+    console.error('Log fetch error:', e);
   }
-  setLoading(this, false);
-});
+}
 
-// ═══════════════════════════════════════
-//  ACTIVITY LOG
-// ═══════════════════════════════════════
+function buildLogExtra(l) {
+  const skip = new Set(['timestamp', 'level', 'event', 'id']);
+  const extra = Object.entries(l).filter(([k]) => !skip.has(k));
+  if (extra.length === 0) return '';
+  return ' <span style="color: var(--text-muted);">' + extra.map(([k, v]) => `${k}=${v}`).join(' ') + '</span>';
+}
 
-async function pollLogs() {
-  try {
-    const data = await api('GET', `/api/logs?since=${logCursor}`);
-    if (data.logs && data.logs.length > 0) {
-      logEntries = logEntries.concat(data.logs);
-      if (logEntries.length > 500) logEntries = logEntries.slice(-500);
-      logCursor = data.cursor;
-      renderLogs();
+function startLogPolling() {
+  stopLogPolling();
+  state.logPollTimer = setInterval(() => {
+    if ($('logAutoPoll') && $('logAutoPoll').checked) {
+      loadLogs();
     }
-  } catch (e) { /* silent */ }
+  }, 3000);
 }
 
-function renderLogs() {
-  const viewer = document.getElementById('logViewer');
-  const levelFilter = document.getElementById('logLevelFilter').value;
-  const filtered = levelFilter ? logEntries.filter(e => e.level === levelFilter) : logEntries;
-
-  if (!filtered.length) {
-    viewer.innerHTML = '<div style="color:var(--text-3);text-align:center;padding:20px">Waiting for activity...</div>';
-    return;
+function stopLogPolling() {
+  if (state.logPollTimer) {
+    clearInterval(state.logPollTimer);
+    state.logPollTimer = null;
   }
-
-  viewer.innerHTML = filtered.slice(-200).map(e => {
-    const time = e.timestamp ? e.timestamp.split('T')[1]?.slice(0, 8) || '' : '';
-    const level = (e.level || 'info').toLowerCase();
-    const extras = Object.keys(e).filter(k => !['timestamp', 'level', 'event', 'id'].includes(k));
-    const extraStr = extras.length ? ` <span class="log-extra">${extras.map(k => k + '=' + e[k]).join(' ')}</span>` : '';
-    return `<div class="log-entry"><span class="log-time">${time}</span><span class="log-level ${level}">${level}</span><span class="log-msg">${e.event || ''}${extraStr}</span></div>`;
-  }).join('');
-
-  if (logAutoScroll) viewer.scrollTop = viewer.scrollHeight;
 }
 
-document.getElementById('logLevelFilter').addEventListener('change', renderLogs);
-document.getElementById('clearLogsBtn').addEventListener('click', () => {
-  logEntries = [];
-  renderLogs();
-});
-document.getElementById('autoScrollBtn').addEventListener('click', function() {
-  logAutoScroll = !logAutoScroll;
-  this.classList.toggle('active', logAutoScroll);
-});
+/* ================================================================
+   SETTINGS
+   ================================================================ */
 
-setInterval(pollLogs, 3000);
-
-// ═══════════════════════════════════════
-//  KILL SWITCH
-// ═══════════════════════════════════════
-
-document.getElementById('killSwitch').addEventListener('change', async function() {
-  await api('PUT', '/api/kill-switch', { enabled: this.checked });
+async function loadSettings() {
   await loadStatus();
-});
+  const cfg = state.config;
+  $('setMaxBankroll').value = cfg.max_bankroll || '';
+  $('setPositionCap').value = cfg.position_cap_pct != null ? (cfg.position_cap_pct * 100) : '';
+  $('setKellyFraction').value = cfg.kelly_fraction || '';
+  $('setEdgeThreshold').value = cfg.min_edge_threshold != null ? (cfg.min_edge_threshold * 100) : '';
+  $('setDailyLoss').value = cfg.daily_loss_limit_pct != null ? (cfg.daily_loss_limit_pct * 100) : '';
+  $('setLogLevel').value = cfg.log_level || 'INFO';
+}
 
-document.getElementById('settingsKillSwitch').addEventListener('change', async function() {
-  document.getElementById('killSwitch').checked = this.checked;
-  await api('PUT', '/api/kill-switch', { enabled: this.checked });
-  await loadStatus();
-});
-
-// ═══════════════════════════════════════
-//  SETTINGS
-// ═══════════════════════════════════════
-
-document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+async function saveSettings() {
   const body = {
-    max_bankroll: parseFloat(document.getElementById('cfgBankroll').value),
-    position_cap_pct: parseFloat(document.getElementById('cfgPositionCap').value) / 100,
-    kelly_fraction: parseFloat(document.getElementById('cfgKelly').value),
-    min_edge_threshold: parseFloat(document.getElementById('cfgMinEdge').value) / 100,
-    daily_loss_limit_pct: parseFloat(document.getElementById('cfgDailyLoss').value) / 100,
-    log_level: document.getElementById('cfgLogLevel').value,
-    kill_switch: document.getElementById('settingsKillSwitch').checked,
+    max_bankroll: parseFloat($('setMaxBankroll').value) || undefined,
+    position_cap_pct: $('setPositionCap').value ? parseFloat($('setPositionCap').value) / 100 : undefined,
+    kelly_fraction: parseFloat($('setKellyFraction').value) || undefined,
+    min_edge_threshold: $('setEdgeThreshold').value ? parseFloat($('setEdgeThreshold').value) / 100 : undefined,
+    daily_loss_limit_pct: $('setDailyLoss').value ? parseFloat($('setDailyLoss').value) / 100 : undefined,
+    log_level: $('setLogLevel').value || undefined,
   };
-  await api('PUT', '/api/settings', body);
-  await loadStatus();
-  const btn = document.getElementById('saveSettingsBtn');
-  const orig = btn.textContent;
-  btn.textContent = 'Saved!';
-  btn.style.background = 'var(--green)';
-  setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+
+  // Remove undefined keys
+  Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+
+  try {
+    const data = await api('PUT', '/api/settings', body);
+    updateStatusUI(data);
+    toast('Settings saved', 'success');
+  } catch (e) {
+    toast('Failed to save: ' + e.message, 'error');
+  }
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadDashboard();
 });
 
-// ═══════════════════════════════════════
-//  FILTERS & CHART RANGE
-// ═══════════════════════════════════════
-
-document.getElementById('filterStatus').addEventListener('change', renderHistory);
-
-document.querySelectorAll('.pill-btn[data-range]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.pill-btn[data-range]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentRange = btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range);
-    drawChart();
-  });
+// Resize equity curve on window resize
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (state.activeTab === 'dashboard') loadEquityCurve();
+  }, 250);
 });
-
-// ═══════════════════════════════════════
-//  POSITIONS & P&L
-// ═══════════════════════════════════════
-
-async function loadPositions() {
-  try {
-    positionsData = await api('GET', '/api/positions');
-    renderPositions();
-  } catch (e) { console.error('positions load failed', e); }
-}
-
-function renderPositions() {
-  const positions = positionsData.positions ?? [];
-  const summary = positionsData.summary ?? {};
-
-  // Summary cards
-  document.getElementById('posCount').textContent = summary.position_count || 0;
-
-  const exposure = summary.total_exposure || 0;
-  document.getElementById('posExposure').textContent = '$' + exposure.toFixed(2);
-
-  const expectedPnl = summary.total_expected_pnl || 0;
-  const expectedEl = document.getElementById('posExpectedPnl');
-  expectedEl.textContent = (expectedPnl >= 0 ? '+' : '') + '$' + expectedPnl.toFixed(2);
-  expectedEl.className = 'card-value ' + (expectedPnl >= 0 ? 'positive' : 'negative');
-
-  const expectedReturn = summary.total_expected_return || 0;
-  document.getElementById('posExpectedReturn').textContent = (expectedReturn * 100).toFixed(1) + '% expected return';
-
-  const maxProfit = summary.total_max_profit || 0;
-  const maxProfitEl = document.getElementById('posMaxProfit');
-  maxProfitEl.textContent = '+$' + maxProfit.toFixed(2);
-  maxProfitEl.className = 'card-value positive';
-
-  const maxLoss = summary.total_max_loss || 0;
-  document.getElementById('posMaxLoss').textContent = 'Max loss: -$' + Math.abs(maxLoss).toFixed(2);
-
-  // Scenario bar
-  const scenarioWrap = document.getElementById('posScenarioWrap');
-  if (positions.length > 0) {
-    scenarioWrap.style.display = 'block';
-    document.getElementById('scenarioLoss').textContent = '-$' + Math.abs(maxLoss).toFixed(0);
-    document.getElementById('scenarioProfit').textContent = '+$' + maxProfit.toFixed(0);
-
-    const range = maxProfit - maxLoss;
-    const markerPos = range > 0 ? ((expectedPnl - maxLoss) / range) * 100 : 50;
-    document.getElementById('scenarioMarker').style.left = Math.max(2, Math.min(98, markerPos)) + '%';
-    document.getElementById('scenarioExpected').textContent = 'Expected: ' + (expectedPnl >= 0 ? '+' : '') + '$' + expectedPnl.toFixed(2);
-  } else {
-    scenarioWrap.style.display = 'none';
-  }
-
-  // Table
-  const tbody = document.getElementById('posTableBody');
-  if (!positions.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No open positions. Place bets to see P&L estimates.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = positions.map(pos => {
-    const desc = makeBetDescription(pos);
-    const sideBadge = pos.side === 'YES' ? '<span class="badge badge-yes">YES</span>' : '<span class="badge badge-no">NO</span>';
-    const maxProfitCls = 'val-pos';
-    const maxLossCls = 'val-neg';
-    const expectedCls = pos.expected_pnl >= 0 ? 'val-pos' : 'val-neg';
-    const eventStr = pos.event_date ? formatDate(pos.event_date) : '';
-    const daysStr = pos.days_until_event != null ? ` (${pos.days_until_event}d)` : '';
-
-    return `<tr onclick="openTradeModal('${pos.trade_id}')">
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${desc}">${desc}</td>
-      <td>${sideBadge}</td>
-      <td>$${pos.size.toFixed(2)}</td>
-      <td>${pos.entry_price.toFixed(2)}</td>
-      <td>${(pos.noaa_probability * 100).toFixed(0)}%</td>
-      <td class="${maxProfitCls}">+$${pos.max_profit.toFixed(2)}</td>
-      <td class="${maxLossCls}">-$${Math.abs(pos.max_loss).toFixed(2)}</td>
-      <td class="${expectedCls}" style="font-weight:600">${pos.expected_pnl >= 0 ? '+' : ''}$${pos.expected_pnl.toFixed(2)}</td>
-      <td>${eventStr}${daysStr}</td>
-    </tr>`;
-  }).join('');
-}
-
-// ═══════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════
-
-const savedSignals = localStorage.getItem('lastScanSignals');
-if (savedSignals) {
-  try {
-    signalsData = JSON.parse(savedSignals);
-    renderSignalRows(signalsData, 'signalsBody', 'signalsSection', false);
-  } catch(e) { /* ignore */ }
-}
-updateScanTime();
-
-loadAll();
-setupChartHover();
-window.addEventListener('resize', drawChart);
-pollLogs();
-
-// Auto-refresh status + portfolio every 60s
-setInterval(async () => {
-  await Promise.all([loadStatus(), loadPortfolio()]);
-}, 60000);
 </script>
 </body>
 </html>

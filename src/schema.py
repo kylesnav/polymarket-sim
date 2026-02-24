@@ -12,7 +12,7 @@ import structlog
 
 logger = structlog.get_logger()
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 CREATE_TRADES_TABLE = """
 CREATE TABLE IF NOT EXISTS trades (
@@ -67,12 +67,38 @@ CREATE TABLE IF NOT EXISTS markets (
 )
 """
 
+CREATE_EVENTS_TABLE = """
+CREATE TABLE IF NOT EXISTS events (
+    event_id TEXT PRIMARY KEY,
+    question TEXT NOT NULL,
+    location TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
+    event_date TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    bucket_count INTEGER NOT NULL,
+    bucket_labels TEXT NOT NULL,
+    cached_at TEXT NOT NULL
+)
+"""
+
 CREATE_SCHEMA_VERSION_TABLE = """
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY,
     applied_at TEXT NOT NULL
 )
 """
+
+# Multi-outcome columns added to trades in schema v3.
+MULTI_OUTCOME_COLUMNS = [
+    ("event_id", "TEXT DEFAULT ''"),
+    ("bucket_index", "INTEGER DEFAULT -1"),
+    ("token_id", "TEXT DEFAULT ''"),
+    ("outcome_label", "TEXT DEFAULT ''"),
+    ("fill_price", "TEXT DEFAULT NULL"),
+    ("book_depth", "TEXT DEFAULT NULL"),
+    ("resolution_source", "TEXT DEFAULT ''"),
+]
 
 # Context columns added to the trades table for human-readable display.
 CONTEXT_COLUMNS = [
@@ -101,6 +127,7 @@ def create_tables(conn: sqlite3.Connection) -> None:
     cursor.execute(CREATE_POSITIONS_TABLE)
     cursor.execute(CREATE_DAILY_SNAPSHOTS_TABLE)
     cursor.execute(CREATE_MARKETS_TABLE)
+    cursor.execute(CREATE_EVENTS_TABLE)
     cursor.execute(CREATE_SCHEMA_VERSION_TABLE)
     conn.commit()
 
@@ -113,6 +140,22 @@ def ensure_context_columns(conn: sqlite3.Connection) -> None:
     """
     cursor = conn.cursor()
     for col_name, col_type in CONTEXT_COLUMNS:
+        try:
+            cursor.execute(f"ALTER TABLE trades ADD COLUMN {col_name} {col_type}")
+        except sqlite3.OperationalError as e:
+            if "duplicate column" not in str(e).lower():
+                raise
+    conn.commit()
+
+
+def ensure_multi_outcome_columns(conn: sqlite3.Connection) -> None:
+    """Add multi-outcome columns to trades table if they don't exist.
+
+    Args:
+        conn: SQLite database connection.
+    """
+    cursor = conn.cursor()
+    for col_name, col_type in MULTI_OUTCOME_COLUMNS:
         try:
             cursor.execute(f"ALTER TABLE trades ADD COLUMN {col_name} {col_type}")
         except sqlite3.OperationalError as e:
@@ -150,6 +193,7 @@ def run_migrations(conn: sqlite3.Connection) -> None:
     migrations: list[tuple[int, str, str]] = [
         (1, "Initial schema", ""),  # Handled by create_tables
         (2, "Add context columns", ""),  # Handled by ensure_context_columns
+        (3, "Add multi-outcome columns and events table", ""),
     ]
 
     for version, description, _sql in migrations:
@@ -178,4 +222,5 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
     """
     create_tables(conn)
     ensure_context_columns(conn)
+    ensure_multi_outcome_columns(conn)
     run_migrations(conn)

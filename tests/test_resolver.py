@@ -222,7 +222,9 @@ class TestResolveTradesSkipsFuture:
             comparison="above",
         )
 
-        stats = resolve_trades(journal, noaa)
+        polymarket = MagicMock()
+        polymarket.get_resolution_data.return_value = {}
+        stats = resolve_trades(journal, polymarket, noaa)
 
         assert stats["resolved_count"] == 0
         assert stats["skipped_future"] == 1
@@ -257,7 +259,9 @@ class TestResolveTradesSkipsFuture:
             comparison="above",
         )
 
-        stats = resolve_trades(journal, noaa)
+        polymarket = MagicMock()
+        polymarket.get_resolution_data.return_value = {}
+        stats = resolve_trades(journal, polymarket, noaa)
 
         assert stats["resolved_count"] == 1
         assert stats["wins"] == 1

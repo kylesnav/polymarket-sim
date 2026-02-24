@@ -12,6 +12,7 @@ import typer
 from src.config import Settings
 from src.journal import Journal
 from src.noaa import NOAAClient
+from src.polymarket import PolymarketClient
 from src.resolver import resolve_trades
 from src.simulator import Simulator
 
@@ -261,18 +262,64 @@ def positions() -> None:
 
 
 @app.command()
+def events() -> None:
+    """Scan for multi-outcome weather events with bucket-level signals."""
+    settings = Settings()
+    _configure_logging(settings.log_level)
+
+    logger.info("starting_event_scan")
+
+    sim = Simulator(
+        bankroll=Decimal(str(settings.max_bankroll)),
+        min_edge=Decimal(str(settings.min_edge_threshold)),
+        kelly_fraction=Decimal(str(settings.kelly_fraction)),
+        position_cap_pct=Decimal(str(settings.position_cap_pct)),
+        max_bankroll=Decimal(str(settings.max_bankroll)),
+        daily_loss_limit_pct=Decimal(str(settings.daily_loss_limit_pct)),
+        kill_switch=settings.kill_switch,
+    )
+
+    try:
+        signals = sim.run_event_scan()
+
+        if not signals:
+            typer.echo("No actionable bucket signals found.")
+            return
+
+        typer.echo(
+            f"{'Event':<30} {'Bucket':<20} {'Side':<5} "
+            f"{'NOAA':>6} {'Mkt':>6} {'Edge':>7} {'Size ($)':>9}"
+        )
+        typer.echo("-" * 88)
+        for signal in signals:
+            typer.echo(
+                f"{signal.event_id[:29]:<30} "
+                f"{signal.outcome_label[:19]:<20} "
+                f"{signal.side:<5} "
+                f"{signal.noaa_probability:>6.2f} "
+                f"{signal.market_price:>6.2f} "
+                f"{signal.edge:>+7.2f} "
+                f"${signal.recommended_size:>8.2f}"
+            )
+        typer.echo(f"\nFound {len(signals)} bucket signal(s) above threshold.")
+    finally:
+        sim.close()
+
+
+@app.command()
 def resolve() -> None:
-    """Resolve unresolved trades against actual NOAA weather outcomes."""
+    """Resolve unresolved trades using Polymarket resolution data."""
     settings = Settings()
     _configure_logging(settings.log_level)
 
     logger.info("starting_trade_resolution")
 
     journal = Journal()
+    polymarket = PolymarketClient()
     noaa = NOAAClient()
 
     try:
-        stats = resolve_trades(journal, noaa)
+        stats = resolve_trades(journal, polymarket, noaa)
 
         typer.echo("=== Trade Resolution Summary ===")
         typer.echo(f"Trades resolved: {stats['resolved_count']}")
@@ -280,6 +327,7 @@ def resolve() -> None:
         typer.echo(f"Losses: {stats['losses']}")
         typer.echo(f"Total actual P&L: ${stats['total_pnl']:+.2f}")  # type: ignore[str-format]
     finally:
+        polymarket.close()
         noaa.close()
         journal.close()
 

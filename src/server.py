@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from src.config import Settings
 from src.journal import Journal
 from src.noaa import NOAAClient
+from src.polymarket import PolymarketClient
 from src.resolver import resolve_trades
 from src.simulator import Simulator
 
@@ -198,6 +199,69 @@ def _enrich_signals(
                 d["potential_payout"] = 0.0
         enriched.append(d)
     return enriched
+
+
+def _enrich_bucket_signals(
+    signals: list[Any],  # noqa: ANN401
+    sim: Simulator,
+) -> list[dict[str, Any]]:
+    """Add event context to bucket signal dicts."""
+    event_lookup = {e.event_id: e for e in sim.last_events}
+    enriched: list[dict[str, Any]] = []
+    for s in signals:
+        d: dict[str, Any] = s.model_dump()
+        event = event_lookup.get(s.event_id)
+        if event:
+            d["question"] = event.question
+            d["location"] = event.location
+            d["event_date"] = event.event_date.isoformat()
+            d["metric"] = event.metric
+            d["bucket_count"] = len(event.buckets)
+            # Compute potential payout
+            price = float(d.get("market_price", 0))
+            size = float(d.get("recommended_size", 0))
+            side = d.get("side", "YES")
+            effective_price = price if side == "YES" else 1.0 - price
+            if effective_price > 0:
+                d["potential_payout"] = round(
+                    size * (1.0 - effective_price) / effective_price, 2
+                )
+            else:
+                d["potential_payout"] = 0.0
+        enriched.append(d)
+    return enriched
+
+
+def _serialize_events(sim: Simulator) -> list[dict[str, Any]]:
+    """Serialize weather events with bucket data for the frontend."""
+    events: list[dict[str, Any]] = []
+    for event in sim.last_events:
+        buckets = []
+        for i, b in enumerate(event.buckets):
+            buckets.append({
+                "index": i,
+                "token_id": b.token_id,
+                "condition_id": b.condition_id,
+                "outcome_label": b.outcome_label,
+                "lower_bound": b.lower_bound,
+                "upper_bound": b.upper_bound,
+                "yes_price": float(b.yes_price),
+                "no_price": float(b.no_price),
+                "volume": float(b.volume),
+            })
+        events.append({
+            "event_id": event.event_id,
+            "question": event.question,
+            "location": event.location,
+            "lat": event.lat,
+            "lon": event.lon,
+            "event_date": event.event_date.isoformat(),
+            "metric": event.metric,
+            "bucket_count": len(event.buckets),
+            "buckets": buckets,
+            "close_date": event.close_date.isoformat(),
+        })
+    return events
 
 
 # ── Static ──────────────────────────────────────────
@@ -429,19 +493,124 @@ async def run_sim_execute(
         sim.close()
 
 
+@app.post("/api/events/scan")
+def run_event_scan(
+    sim: Annotated[Simulator, Depends(get_simulator)],
+) -> JSONResponse:
+    """Scan for multi-outcome weather events with bucket-level signals."""
+    try:
+        signals = sim.run_event_scan()
+        return _json({
+            "signals": _enrich_bucket_signals(signals, sim),
+            "events": _serialize_events(sim),
+            "count": len(signals),
+        })
+    except Exception as e:
+        logger.error("event_scan_failed", error=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        sim.close()
+
+
+@app.post("/api/events/execute")
+async def run_event_execute(
+    request: Request,
+    sim: Annotated[Simulator, Depends(get_simulator)],
+) -> JSONResponse:
+    """Execute paper trades for selected bucket signals.
+
+    Accepts JSON body with {"selections": [{"event_id": "...", "bucket_indices": [0, 2]}]}.
+    Scans events, filters signals to selected buckets, and executes.
+    """
+    body = await request.json()
+    selections: list[dict[str, Any]] = body.get("selections", [])
+    if not selections:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "No selections provided"},
+        )
+
+    try:
+        signals = sim.run_event_scan()
+
+        # Build selection set: (event_id, bucket_index)
+        selection_set: set[tuple[str, int]] = set()
+        for sel in selections:
+            event_id = sel.get("event_id", "")
+            for idx in sel.get("bucket_indices", []):
+                selection_set.add((event_id, int(idx)))
+
+        selected = [
+            s for s in signals
+            if (s.event_id, s.bucket_index) in selection_set
+        ]
+
+        if not selected:
+            return _json({
+                "trades": [],
+                "skipped": len(selection_set),
+                "message": "None of the selected buckets had actionable signals.",
+            })
+
+        trades = sim.execute_bucket_signals(selected)
+        return _json({
+            "trades": [t.model_dump() for t in trades],
+            "signals": _enrich_bucket_signals(selected, sim),
+            "skipped": len(selection_set) - len(trades),
+            "skip_reasons": sim.last_skip_reasons,
+            "message": f"Placed {len(trades)} bet(s).",
+        })
+    except Exception as e:
+        logger.error("event_execute_failed", error=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        sim.close()
+
+
+@app.get("/api/events/{event_id}")
+def get_event_detail(
+    event_id: str,
+    journal: Annotated[Journal, Depends(get_journal)],
+) -> JSONResponse:
+    """Get detailed event view with bucket data and trade history."""
+    try:
+        metadata = journal.get_event_metadata(event_id)
+        if metadata is None:
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Event not found"},
+            )
+        trades = journal.get_trades_by_event(event_id)
+        return _json({
+            "event": metadata,
+            "trades": trades,
+            "trade_count": len(trades),
+        })
+    except Exception as e:
+        logger.error("event_detail_failed", error=str(e))
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        journal.close()
+
+
 @app.post("/api/resolve")
 def run_resolve(
     journal: Annotated[Journal, Depends(get_journal)],
 ) -> JSONResponse:
-    """Resolve unresolved trades against actual weather. Equivalent to `cli resolve`."""
+    """Resolve unresolved trades using Polymarket resolution data.
+
+    Falls back to NOAA observations for legacy trades without event_id.
+    """
+    polymarket = PolymarketClient()
     noaa = NOAAClient()
     try:
-        stats = resolve_trades(journal, noaa)
+        stats = resolve_trades(journal, polymarket, noaa)
         return _json(stats)
     except Exception as e:
         logger.error("resolve_failed", error=str(e))
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
+        polymarket.close()
         noaa.close()
         journal.close()
 
