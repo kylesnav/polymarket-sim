@@ -13,7 +13,13 @@ import httpx
 import structlog
 from py_clob_client.client import ClobClient  # type: ignore[import-untyped]
 
-from src.models import WeatherMarket
+from src.models import (
+    OrderBook,
+    OrderBookLevel,
+    OutcomeBucket,
+    WeatherEvent,
+    WeatherMarket,
+)
 
 logger = structlog.get_logger()
 
@@ -215,6 +221,169 @@ class PolymarketClient:
         """Close HTTP clients."""
         self._http.close()
         self._clob_http.close()
+
+    def get_weather_events(self) -> list[WeatherEvent]:
+        """Fetch weather events grouped by parent event from the Gamma API.
+
+        Groups Gamma API markets by their parent event, parsing each nested
+        market into an OutcomeBucket to build multi-outcome WeatherEvents.
+
+        Returns:
+            List of WeatherEvent objects with bucket data.
+        """
+        tag_slugs = ["temperature", "precipitation", "snowfall", "weather"]
+        seen_event_ids: set[str] = set()
+        events: list[WeatherEvent] = []
+
+        for tag_slug in tag_slugs:
+            raw_events = self._fetch_raw_events(tag_slug)
+            for event_data in raw_events:
+                event_id = str(event_data.get("id", ""))
+                if not event_id or event_id in seen_event_ids:
+                    continue
+                seen_event_ids.add(event_id)
+                parsed = self._try_parse_weather_event(event_data)
+                if parsed is not None:
+                    events.append(parsed)
+
+        logger.info("weather_events_found", count=len(events))
+        return events
+
+    def get_order_book(self, token_id: str) -> OrderBook | None:
+        """Fetch the L2 order book for a token from the CLOB API.
+
+        Args:
+            token_id: The outcome token ID.
+
+        Returns:
+            OrderBook snapshot or None if the fetch fails.
+        """
+        try:
+            result: Any = _retry_with_backoff(
+                lambda: self._client.get_order_book(token_id)
+            )
+        except Exception as e:
+            logger.warning(
+                "order_book_fetch_failed",
+                token_id=token_id[:20],
+                error=str(e),
+            )
+            return None
+
+        bids: list[OrderBookLevel] = []
+        asks: list[OrderBookLevel] = []
+        now = datetime.now(tz=UTC)
+
+        if isinstance(result, dict):
+            for bid in result.get("bids", []):
+                if isinstance(bid, dict):
+                    try:
+                        bids.append(OrderBookLevel(
+                            price=Decimal(str(bid["price"])),
+                            size=Decimal(str(bid["size"])),
+                        ))
+                    except (KeyError, InvalidOperation):
+                        continue
+            for ask in result.get("asks", []):
+                if isinstance(ask, dict):
+                    try:
+                        asks.append(OrderBookLevel(
+                            price=Decimal(str(ask["price"])),
+                            size=Decimal(str(ask["size"])),
+                        ))
+                    except (KeyError, InvalidOperation):
+                        continue
+
+        # Sort: bids descending by price, asks ascending by price
+        bids.sort(key=lambda x: x.price, reverse=True)
+        asks.sort(key=lambda x: x.price)
+
+        return OrderBook(
+            token_id=token_id,
+            bids=bids,
+            asks=asks,
+            timestamp=now,
+        )
+
+    def get_resolution_data(self, event_id: str) -> dict[str, Decimal]:
+        """Get resolution outcome data for a resolved event.
+
+        Queries the Gamma API for the event's markets and extracts
+        the final outcome prices. Returns a mapping of token_id to
+        final price (1.0 for winner, 0.0 for losers).
+
+        Args:
+            event_id: The Gamma event ID.
+
+        Returns:
+            Dict mapping token_id to final price Decimal.
+            Empty dict if the event is not yet resolved.
+        """
+        try:
+            response = self._http.get(f"/events/{event_id}")
+            response.raise_for_status()
+            event_data: Any = response.json()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.warning(
+                "resolution_fetch_failed",
+                event_id=event_id,
+                error=str(e),
+            )
+            return {}
+
+        if not isinstance(event_data, dict):
+            return {}
+
+        # Check if event is resolved — "closed" field or all markets resolved
+        markets: Any = event_data.get("markets", [])
+        if not isinstance(markets, list):
+            return {}
+
+        resolution: dict[str, Decimal] = {}
+        all_resolved = True
+
+        for market in markets:
+            if not isinstance(market, dict):
+                continue
+            # Gamma uses "resolved" field
+            if not market.get("resolved", False):
+                all_resolved = False
+                continue
+
+            outcome_prices_raw: Any = market.get(
+                "outcomePrices",
+                market.get("outcome_prices", ""),
+            )
+            if isinstance(outcome_prices_raw, str):
+                try:
+                    outcome_prices_raw = json.loads(outcome_prices_raw)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+            if not isinstance(outcome_prices_raw, list) or len(outcome_prices_raw) < 2:
+                continue
+
+            # Get token IDs for this market
+            clob_token_ids_raw: Any = market.get("clobTokenIds", "")
+            if isinstance(clob_token_ids_raw, str):
+                try:
+                    clob_token_ids_raw = json.loads(clob_token_ids_raw)
+                except (json.JSONDecodeError, TypeError):
+                    clob_token_ids_raw = []
+
+            if isinstance(clob_token_ids_raw, list) and len(clob_token_ids_raw) > 0:
+                # YES token is index 0
+                try:
+                    token_id = str(clob_token_ids_raw[0])
+                    final_price = Decimal(str(outcome_prices_raw[0]))
+                    resolution[token_id] = final_price
+                except (IndexError, InvalidOperation):
+                    pass
+
+        if not all_resolved:
+            return {}
+
+        return resolution
 
     def get_weather_markets(self) -> list[WeatherMarket]:
         """Fetch weather markets using the Gamma API events endpoint.
@@ -503,6 +672,264 @@ class PolymarketClient:
             token_id=token_id,
             created_at=created_at,
         )
+
+    def _fetch_raw_events(self, tag_slug: str) -> list[dict[str, Any]]:
+        """Fetch raw event dicts from the Gamma API (not flattened to markets).
+
+        Args:
+            tag_slug: The Gamma API tag slug.
+
+        Returns:
+            List of raw event dicts, each containing a "markets" list.
+        """
+        all_events: list[dict[str, Any]] = []
+        offset = 0
+        limit = 100
+        max_pages = 5
+
+        for page in range(max_pages):
+            logger.info(
+                "gamma_events_fetch",
+                tag_slug=tag_slug,
+                offset=offset,
+                page=page + 1,
+            )
+            try:
+                response = self._http.get(
+                    "/events",
+                    params={
+                        "tag_slug": tag_slug,
+                        "active": "true",
+                        "closed": "false",
+                        "limit": limit,
+                        "offset": offset,
+                    },
+                )
+                response.raise_for_status()
+                events: Any = response.json()
+            except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                logger.warning(
+                    "gamma_raw_events_error",
+                    tag_slug=tag_slug,
+                    error=str(e),
+                )
+                break
+
+            if not isinstance(events, list) or len(events) == 0:
+                break
+
+            for event in events:
+                if isinstance(event, dict):
+                    all_events.append(event)
+
+            if len(events) < limit:
+                break
+            offset += limit
+
+        return all_events
+
+    def _try_parse_weather_event(
+        self, event_data: dict[str, Any]
+    ) -> WeatherEvent | None:
+        """Parse a raw Gamma API event dict into a WeatherEvent.
+
+        Args:
+            event_data: Raw event data from Gamma API.
+
+        Returns:
+            WeatherEvent with parsed buckets, or None if parsing fails.
+        """
+        title: str = str(event_data.get("title", event_data.get("question", "")))
+        q_lower = title.lower()
+
+        if not any(kw in q_lower for kw in WEATHER_KEYWORDS):
+            return None
+
+        event_id = str(event_data.get("id", ""))
+        if not event_id:
+            return None
+
+        markets_raw: Any = event_data.get("markets", [])
+        if not isinstance(markets_raw, list) or not markets_raw:
+            return None
+
+        # Parse location and metric from the event title
+        parsed = _parse_weather_question(title)
+        if parsed is None:
+            # Try the first market's question as fallback
+            first_q = str(markets_raw[0].get("question", "")) if markets_raw else ""
+            parsed = _parse_weather_question(first_q)
+            if parsed is None:
+                return None
+
+        location, lat, lon, event_date, metric, _threshold, _comparison = parsed
+
+        # Parse each market into a bucket
+        buckets: list[OutcomeBucket] = []
+        close_date: datetime | None = None
+        created_at: datetime | None = None
+
+        for market in markets_raw:
+            if not isinstance(market, dict):
+                continue
+
+            question = str(market.get("question", ""))
+            condition_id = str(
+                market.get("conditionId", market.get("condition_id", ""))
+            )
+
+            # Parse outcome prices
+            outcome_prices_raw: Any = market.get(
+                "outcomePrices", market.get("outcome_prices", [])
+            )
+            if isinstance(outcome_prices_raw, str):
+                try:
+                    outcome_prices_raw = json.loads(outcome_prices_raw)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+            if (
+                not isinstance(outcome_prices_raw, list)
+                or len(outcome_prices_raw) < 2
+            ):
+                continue
+
+            try:
+                yes_price = Decimal(str(outcome_prices_raw[0]))
+                no_price = Decimal(str(outcome_prices_raw[1]))
+            except (InvalidOperation, IndexError):
+                continue
+
+            # Get token ID
+            token_id = ""
+            clob_token_ids: Any = market.get("clobTokenIds")
+            if isinstance(clob_token_ids, str):
+                try:
+                    ids = json.loads(clob_token_ids)
+                    if isinstance(ids, list) and len(ids) > 0:
+                        token_id = str(ids[0])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            try:
+                volume = Decimal(
+                    str(market.get("volume", market.get("volumeNum", "0")))
+                )
+            except InvalidOperation:
+                volume = Decimal("0")
+
+            # Parse the bucket label to extract bounds
+            lower, upper = _parse_outcome_label(question, metric)
+
+            buckets.append(OutcomeBucket(
+                token_id=token_id,
+                condition_id=condition_id,
+                outcome_label=question,
+                lower_bound=lower,
+                upper_bound=upper,
+                yes_price=yes_price,
+                no_price=no_price,
+                volume=volume,
+            ))
+
+            # Use the first market's close/creation dates for the event
+            if close_date is None:
+                close_date_str = str(
+                    market.get(
+                        "endDate",
+                        market.get("close_date", market.get("end_date_iso", "")),
+                    )
+                )
+                close_date = _parse_datetime(close_date_str)
+            if created_at is None:
+                created_at_str = str(
+                    market.get("createdAt", market.get("created_at", ""))
+                )
+                created_at = _parse_datetime(created_at_str)
+
+        if not buckets or close_date is None:
+            return None
+
+        # Sort buckets by lower_bound (None sorts first for "X or below")
+        buckets.sort(key=lambda b: b.lower_bound if b.lower_bound is not None else float("-inf"))
+
+        return WeatherEvent(
+            event_id=event_id,
+            question=title,
+            location=location,
+            lat=lat,
+            lon=lon,
+            event_date=event_date,
+            metric=metric,
+            buckets=buckets,
+            close_date=close_date,
+            created_at=created_at,
+        )
+
+
+def _parse_outcome_label(
+    question: str,
+    metric: str,
+) -> tuple[float | None, float | None]:
+    """Parse bucket bounds from a market outcome question.
+
+    Handles patterns like:
+    - "48-49 degrees F" → (48.0, 49.0)
+    - "47°F or below" → (None, 47.0)
+    - "55°F or above" → (55.0, None)
+    - "0.1 inches or more" → (0.1, None)
+
+    Args:
+        question: The market question text.
+        metric: The weather metric type.
+
+    Returns:
+        Tuple of (lower_bound, upper_bound). None means open-ended.
+    """
+    q = question.lower()
+
+    # Range pattern: "48-49", "48 - 49", "48 to 49"
+    range_match = re.search(
+        r"(\d+\.?\d*)\s*(?:°[fFcC]?\s*)?(?:-|to)\s*(\d+\.?\d*)", question
+    )
+    if range_match:
+        return float(range_match.group(1)), float(range_match.group(2))
+
+    # "X or below/under/less"
+    below_match = re.search(
+        r"(\d+\.?\d*)\s*(?:°[fFcC]?)?\s*(?:or\s+)?(?:below|under|less|lower)",
+        question,
+        re.IGNORECASE,
+    )
+    if below_match:
+        return None, float(below_match.group(1))
+
+    # "below/under X"
+    below_match2 = re.search(
+        r"(?:below|under|less than)\s+(\d+\.?\d*)",
+        q,
+    )
+    if below_match2:
+        return None, float(below_match2.group(1))
+
+    # "X or above/over/more/higher"
+    above_match = re.search(
+        r"(\d+\.?\d*)\s*(?:°[fFcC]?)?\s*(?:or\s+)?(?:above|over|more|higher)",
+        question,
+        re.IGNORECASE,
+    )
+    if above_match:
+        return float(above_match.group(1)), None
+
+    # "above/over X"
+    above_match2 = re.search(
+        r"(?:above|over|more than|at least)\s+(\d+\.?\d*)",
+        q,
+    )
+    if above_match2:
+        return float(above_match2.group(1)), None
+
+    return None, None
 
 
 def _parse_weather_question(

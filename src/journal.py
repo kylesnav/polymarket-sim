@@ -18,11 +18,13 @@ if TYPE_CHECKING:
     from datetime import date
     from decimal import Decimal
 
-    from src.models import Trade
+    from src.models import Trade, WeatherEvent
 from src.queries import (
     backfill_trade_context,
+    cache_event,
     cache_market,
     get_daily_pnl,
+    get_event_metadata,
     get_lifecycle_counts,
     get_market_metadata,
     get_open_position_size,
@@ -32,6 +34,7 @@ from src.queries import (
     get_snapshots,
     get_trade_detail,
     get_trade_history,
+    get_trades_by_event,
     get_trades_with_context,
     get_unresolved_trades,
     has_open_trade,
@@ -341,6 +344,39 @@ class Journal:
             Dict with summary statistics.
         """
         return get_report_data(self._conn, days)
+
+    def cache_event(self, event: WeatherEvent) -> bool:
+        """Cache a multi-outcome weather event's metadata.
+
+        Args:
+            event: WeatherEvent to cache.
+
+        Returns:
+            True if cached successfully.
+        """
+        return cache_event(self._conn, event)
+
+    def get_event_metadata(self, event_id: str) -> dict[str, object] | None:
+        """Retrieve cached event metadata.
+
+        Args:
+            event_id: Event ID to look up.
+
+        Returns:
+            Dict with event metadata or None if not found.
+        """
+        return get_event_metadata(self._conn, event_id)
+
+    def get_trades_by_event(self, event_id: str) -> list[dict[str, object]]:
+        """Get all trades for a specific event.
+
+        Args:
+            event_id: Event ID to query.
+
+        Returns:
+            List of enriched trade dicts for the event.
+        """
+        return get_trades_by_event(self._conn, event_id)
 
     def close(self) -> None:
         """Close the database connection."""

@@ -1,32 +1,42 @@
-"""Trade resolution against actual NOAA weather outcomes.
+"""Trade resolution using Polymarket's own resolution data.
 
-Fetches historical NOAA data for past event dates, compares actual weather
-to trade thresholds, and calculates real P&L.
+For multi-outcome trades (with event_id), uses Polymarket's resolution
+outcome directly. Falls back to NOAA observations for legacy binary trades.
 """
 
 from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import structlog
 
 from src.journal import Journal
 from src.models import NOAAObservation, Trade
-from src.noaa import NOAAClient
+
+if TYPE_CHECKING:
+    from src.noaa import NOAAClient
+    from src.polymarket import PolymarketClient
 
 logger = structlog.get_logger()
 
 
-def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
-    """Resolve unresolved trades against actual NOAA weather data.
+def resolve_trades(
+    journal: Journal,
+    polymarket: PolymarketClient,
+    noaa: NOAAClient | None = None,
+) -> dict[str, object]:
+    """Resolve unresolved trades using Polymarket resolution data.
 
-    For each unresolved trade, fetches the actual weather for the event date,
-    compares to the market threshold, and calculates real P&L.
+    For trades with event_id (multi-outcome): queries Polymarket's API
+    for the event's resolution outcome.
+    For legacy trades (no event_id): falls back to NOAA observations.
 
     Args:
         journal: Trade journal for retrieving trades and market metadata.
-        noaa: NOAA client for fetching historical weather data.
+        polymarket: Polymarket client for resolution data.
+        noaa: Optional NOAA client for legacy trade resolution.
 
     Returns:
         Dict with resolution statistics (count, wins, losses, total_pnl).
@@ -45,90 +55,48 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
     wins = 0
     losses = 0
     total_pnl = Decimal("0")
-
     skipped = 0
 
+    # Cache resolution data per event to avoid redundant API calls
+    resolution_cache: dict[str, dict[str, Decimal]] = {}
+
     for trade in unresolved:
-        # Get market metadata
-        market_data = journal.get_market_metadata(trade.market_id)
-        if market_data is None:
-            logger.warning(
-                "market_metadata_not_found",
-                market_id=trade.market_id,
-                trade_id=trade.trade_id,
+        if trade.event_id:
+            # Multi-outcome trade: use Polymarket resolution
+            result = _resolve_via_polymarket(
+                trade, polymarket, resolution_cache,
             )
-            continue
-
-        event_date = market_data["event_date"]
-        if not isinstance(event_date, date):
-            logger.warning(
-                "invalid_event_date",
-                market_id=trade.market_id,
-                event_date=str(event_date),
-            )
-            continue
-
-        # Skip trades whose event date hasn't passed yet
-        today = date.today()
-        if event_date >= today:
-            logger.info(
-                "skipping_future_event",
-                market_id=trade.market_id,
+        elif noaa is not None:
+            # Legacy binary trade: fall back to NOAA
+            result = _resolve_via_noaa(trade, journal, noaa)
+        else:
+            logger.debug(
+                "skipping_legacy_trade_no_noaa",
                 trade_id=trade.trade_id,
-                event_date=str(event_date),
             )
             skipped += 1
             continue
 
-        # Fetch actual observed weather from NOAA stations
-        lat = float(str(market_data["lat"]))
-        lon = float(str(market_data["lon"]))
-
-        observation = noaa.get_observations(lat, lon, event_date)
-        if observation is None:
-            logger.warning(
-                "observations_unavailable_for_resolution",
-                market_id=trade.market_id,
-                event_date=str(event_date),
-            )
+        if result is None:
+            skipped += 1
             continue
 
-        # Determine if trade won or lost
-        result = _calculate_outcome(
-            trade=trade,
-            observation=observation,
-            metric=str(market_data["metric"]),
-            threshold=float(market_data["threshold"]),  # type: ignore[arg-type]
-            comparison=str(market_data["comparison"]),
-        )
+        outcome, actual_pnl = result
 
-        if result.outcome is None or result.actual_pnl is None:
-            logger.warning(
-                "could_not_calculate_outcome",
-                trade_id=trade.trade_id,
-                market_id=trade.market_id,
-            )
-            continue
-
-        outcome = result.outcome
-        actual_pnl = result.actual_pnl
-
-        # Update journal with resolution
         success = journal.update_trade_resolution(
             trade_id=trade.trade_id,
             outcome=outcome,
             actual_pnl=actual_pnl,
-            actual_value=result.actual_value,
-            actual_value_unit=result.actual_value_unit,
         )
 
         if success:
             logger.info(
                 "trade_resolved",
                 trade_id=trade.trade_id,
-                market_id=trade.market_id,
+                event_id=trade.event_id or trade.market_id,
                 outcome=outcome,
                 actual_pnl=str(actual_pnl),
+                source="polymarket" if trade.event_id else "noaa_legacy",
             )
             resolved_count += 1
             total_pnl += actual_pnl
@@ -140,7 +108,7 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
     logger.info(
         "resolution_complete",
         resolved_count=resolved_count,
-        skipped_future=skipped,
+        skipped=skipped,
         wins=wins,
         losses=losses,
         total_pnl=str(total_pnl),
@@ -153,6 +121,143 @@ def resolve_trades(journal: Journal, noaa: NOAAClient) -> dict[str, object]:
         "losses": losses,
         "total_pnl": total_pnl,
     }
+
+
+def _resolve_via_polymarket(
+    trade: Trade,
+    polymarket: PolymarketClient,
+    cache: dict[str, dict[str, Decimal]],
+) -> tuple[str, Decimal] | None:
+    """Resolve a multi-outcome trade using Polymarket's resolution data.
+
+    Args:
+        trade: Trade with event_id and condition_id.
+        polymarket: Polymarket API client.
+        cache: Resolution data cache keyed by event_id.
+
+    Returns:
+        Tuple of (outcome, actual_pnl) or None if not yet resolved.
+    """
+    event_id = trade.event_id
+    if not event_id:
+        return None
+
+    # Check cache first
+    if event_id not in cache:
+        try:
+            resolution_data = polymarket.get_resolution_data(event_id)
+            cache[event_id] = resolution_data
+        except Exception as e:
+            logger.warning(
+                "resolution_data_fetch_failed",
+                event_id=event_id,
+                error=str(e),
+            )
+            return None
+
+    resolution_data = cache[event_id]
+    if not resolution_data:
+        logger.debug("event_not_yet_resolved", event_id=event_id)
+        return None
+
+    # Look up this trade's token/condition in the resolution
+    token_id = trade.token_id
+    if not token_id:
+        logger.warning(
+            "trade_missing_token_id",
+            trade_id=trade.trade_id,
+            event_id=event_id,
+        )
+        return None
+
+    # Resolution data is keyed by token_id: 1.0 for winner, 0.0 for losers
+    final_price = resolution_data.get(token_id)
+    if final_price is None:
+        logger.warning(
+            "token_not_in_resolution",
+            trade_id=trade.trade_id,
+            token_id=token_id,
+        )
+        return None
+
+    # Determine outcome
+    cost = trade.price if trade.side == "YES" else Decimal("1") - trade.price
+    if final_price == Decimal("1"):
+        # This bucket won
+        if trade.side == "YES":
+            outcome = "won"
+            actual_pnl = trade.size * (Decimal("1") - cost) / cost
+        else:
+            outcome = "lost"
+            actual_pnl = -trade.size
+    else:
+        # This bucket lost
+        if trade.side == "YES":
+            outcome = "lost"
+            actual_pnl = -trade.size
+        else:
+            outcome = "won"
+            actual_pnl = trade.size * (Decimal("1") - cost) / cost
+
+    return outcome, actual_pnl
+
+
+def _resolve_via_noaa(
+    trade: Trade,
+    journal: Journal,
+    noaa: NOAAClient,
+) -> tuple[str, Decimal] | None:
+    """Resolve a legacy binary trade using NOAA observations.
+
+    Args:
+        trade: Legacy trade with market_id.
+        journal: Journal for market metadata lookup.
+        noaa: NOAA client for weather observations.
+
+    Returns:
+        Tuple of (outcome, actual_pnl) or None if cannot resolve.
+    """
+    market_data = journal.get_market_metadata(trade.market_id)
+    if market_data is None:
+        logger.warning(
+            "market_metadata_not_found",
+            market_id=trade.market_id,
+            trade_id=trade.trade_id,
+        )
+        return None
+
+    event_date = market_data["event_date"]
+    if not isinstance(event_date, date):
+        return None
+
+    today = date.today()
+    if event_date >= today:
+        logger.info(
+            "skipping_future_event",
+            trade_id=trade.trade_id,
+            event_date=str(event_date),
+        )
+        return None
+
+    lat = float(str(market_data["lat"]))
+    lon = float(str(market_data["lon"]))
+
+    observation = noaa.get_observations(lat, lon, event_date)
+    if observation is None:
+        return None
+
+    result = _calculate_outcome(
+        trade=trade,
+        observation=observation,
+        metric=str(market_data["metric"]),
+        threshold=float(market_data["threshold"]),  # type: ignore[arg-type]
+        comparison=str(market_data["comparison"]),
+    )
+
+    if result.outcome is None or result.actual_pnl is None:
+        return None
+
+    return result.outcome, result.actual_pnl
 
 
 class _OutcomeResult:
@@ -185,14 +290,13 @@ def _calculate_outcome(
     Args:
         trade: The trade to evaluate.
         observation: Actual NOAA weather station observation data.
-        metric: Metric type ("temperature_high", "temperature_low", "precipitation", "snowfall").
+        metric: Metric type.
         threshold: Threshold value for the event.
         comparison: Comparison type ("above", "below").
 
     Returns:
         _OutcomeResult with outcome, pnl, actual weather value, and unit.
     """
-    # Extract the actual value from observation
     actual_value: float | None = None
     unit = ""
     if metric in ("temperature_high", "temperature_low"):
@@ -209,24 +313,16 @@ def _calculate_outcome(
     if actual_value is None:
         return _OutcomeResult(None, None, None, "")
 
-    # Determine if condition was met
     condition_met = False
     if comparison == "above":
         condition_met = actual_value > threshold
     elif comparison == "below":
         condition_met = actual_value < threshold
     else:
-        # Unsupported comparison type (e.g. "between")
         return _OutcomeResult(None, None, actual_value, unit)
 
-    # Determine win/loss based on trade side
     won = condition_met if trade.side == "YES" else not condition_met
 
-    # Calculate P&L
-    # trade.size is dollars invested. trade.price is the YES price.
-    # For NO trades, cost per contract = 1 - yes_price.
-    # Contracts bought = size / cost_per_contract.
-    # Win payout = contracts * $1. P&L = payout - size.
     cost = trade.price if trade.side == "YES" else Decimal("1") - trade.price
     if won:
         outcome = "won"

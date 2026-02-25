@@ -18,9 +18,18 @@ from src.limits import (
     check_kill_switch,
     check_position_limit,
 )
-from src.models import NBMPercentiles, NOAAForecast, Portfolio, Signal, WeatherMarket
+from src.models import (
+    BucketSignal,
+    NBMPercentiles,
+    NOAAForecast,
+    Portfolio,
+    ProbabilityDistribution,
+    Signal,
+    WeatherEvent,
+    WeatherMarket,
+)
 from src.rules import evaluate_extreme_value
-from src.sizing import calculate_kelly
+from src.sizing import calculate_kelly, calculate_multi_outcome_kelly
 
 logger = structlog.get_logger()
 
@@ -501,6 +510,229 @@ def _precip_probability(forecast: NOAAForecast, market: WeatherMarket) -> float 
     if market.comparison == "below":
         return 1.0 - pop
     return None
+
+
+def compute_bucket_distribution(
+    forecast: NOAAForecast,
+    event: WeatherEvent,
+    nbm: NBMPercentiles | None = None,
+) -> ProbabilityDistribution | None:
+    """Convert NOAA forecast to probability distribution across event buckets.
+
+    Uses the normal CDF to compute P(lower <= X < upper) for each bucket.
+    When NBM percentiles are available, fits a normal to them.
+
+    Args:
+        forecast: NOAA forecast data.
+        event: Multi-outcome weather event with ordered buckets.
+        nbm: Optional NBM percentile data for improved accuracy.
+
+    Returns:
+        ProbabilityDistribution or None if insufficient data.
+    """
+    if not event.buckets:
+        return None
+
+    # Determine mean and std_dev
+    mean: float | None = None
+    std_dev: float | None = None
+    source: str = "fallback"
+
+    if nbm is not None and nbm.p10 is not None and nbm.p90 is not None:
+        std_dev = (nbm.p90 - nbm.p10) / 2.56
+        mean = nbm.p50 if nbm.p50 is not None else (nbm.p90 + nbm.p10) / 2.0
+        source = "nbm"
+    else:
+        if event.metric == "temperature_high":
+            mean = forecast.temperature_high
+        elif event.metric == "temperature_low":
+            mean = forecast.temperature_low
+        else:
+            return None
+
+        if mean is None:
+            return None
+
+        days_out = max(0, (event.event_date - date.today()).days)
+        if days_out <= 1:
+            std_dev = _FALLBACK_TEMP_STD_DEV_1DAY
+        elif days_out <= 2:
+            std_dev = _FALLBACK_TEMP_STD_DEV_2DAY
+        else:
+            std_dev = _FALLBACK_TEMP_STD_DEV_DEFAULT
+        source = "point_forecast_normal"
+
+    if mean is None or std_dev is None or std_dev <= 0:
+        return None
+
+    # Compute raw probabilities per bucket
+    raw_probs: list[float] = []
+    for bucket in event.buckets:
+        if bucket.lower_bound is None and bucket.upper_bound is not None:
+            # Open-ended low: P(X <= upper)
+            z = (bucket.upper_bound - mean) / std_dev
+            raw_probs.append(_normal_cdf(z))
+        elif bucket.upper_bound is None and bucket.lower_bound is not None:
+            # Open-ended high: P(X > lower)
+            z = (bucket.lower_bound - mean) / std_dev
+            raw_probs.append(1.0 - _normal_cdf(z))
+        elif bucket.lower_bound is not None and bucket.upper_bound is not None:
+            # Bounded: P(lower <= X < upper)
+            z_low = (bucket.lower_bound - mean) / std_dev
+            z_high = (bucket.upper_bound - mean) / std_dev
+            raw_probs.append(_normal_cdf(z_high) - _normal_cdf(z_low))
+        else:
+            raw_probs.append(0.0)
+
+    # Normalize to sum to 1.0
+    total = sum(raw_probs)
+    if total <= 0:
+        return None
+
+    normalized = [p / total for p in raw_probs]
+
+    # Apply horizon dampening: pull toward uniform for distant forecasts
+    days_out = max(0, (event.event_date - date.today()).days)
+    horizon_mult = _HORIZON_MULTIPLIERS.get(days_out, _HORIZON_MULTIPLIER_DISTANT)
+    n = len(normalized)
+    uniform = 1.0 / n
+    dampened = [uniform + horizon_mult * (p - uniform) for p in normalized]
+
+    # Re-normalize after dampening
+    d_total = sum(dampened)
+    if d_total <= 0:
+        return None
+    bucket_probs = [Decimal(str(round(p / d_total, 6))) for p in dampened]
+
+    return ProbabilityDistribution(
+        event_id=event.event_id,
+        bucket_probabilities=bucket_probs,
+        mean_forecast=mean,
+        std_dev=std_dev,
+        source=source,  # type: ignore[arg-type]
+    )
+
+
+def scan_weather_events(
+    events: list[WeatherEvent],
+    forecasts: dict[str, NOAAForecast],
+    min_edge: Decimal,
+    kelly_fraction: Decimal,
+    bankroll: Decimal,
+    position_cap_pct: Decimal,
+    max_bankroll: Decimal,
+    daily_loss_limit_pct: Decimal,
+    kill_switch: bool,
+    portfolio: Portfolio,
+    *,
+    max_forecast_horizon_days: int = 7,
+    nbm_data: dict[str, NBMPercentiles] | None = None,
+) -> list[BucketSignal]:
+    """Compare NOAA distributions against bucket prices and generate signals.
+
+    Args:
+        events: List of multi-outcome weather events.
+        forecasts: Dict mapping event_id to NOAA forecast data.
+        min_edge: Minimum edge threshold to generate a signal.
+        kelly_fraction: Kelly multiplier (e.g., 0.25 for quarter-Kelly).
+        bankroll: Current bankroll in dollars.
+        position_cap_pct: Maximum position size as fraction of bankroll.
+        max_bankroll: Maximum allowed bankroll.
+        daily_loss_limit_pct: Daily loss halt threshold.
+        kill_switch: Whether the kill switch is engaged.
+        portfolio: Current portfolio state.
+        max_forecast_horizon_days: Skip events beyond this horizon.
+        nbm_data: Optional NBM percentile data keyed by event_id.
+
+    Returns:
+        List of bucket-level trading signals sorted by forecast horizon.
+    """
+    allowed, reason = check_kill_switch(kill_switch)
+    if not allowed:
+        logger.warning("event_scanning_halted", reason=reason)
+        return []
+
+    allowed, reason = check_daily_loss(
+        portfolio.daily_pnl, portfolio.starting_bankroll, daily_loss_limit_pct,
+    )
+    if not allowed:
+        logger.warning("event_scanning_halted_daily_loss", reason=reason)
+        return []
+
+    signals: list[BucketSignal] = []
+    today = date.today()
+    event_position_cap = max_bankroll * position_cap_pct
+
+    for event in events:
+        days_out = max(0, (event.event_date - today).days)
+        if days_out > max_forecast_horizon_days:
+            continue
+
+        forecast = forecasts.get(event.event_id)
+        if forecast is None:
+            continue
+
+        nbm = nbm_data.get(event.event_id) if nbm_data else None
+        dist = compute_bucket_distribution(forecast, event, nbm=nbm)
+        if dist is None:
+            continue
+
+        market_prices = [b.yes_price for b in event.buckets]
+
+        allocations = calculate_multi_outcome_kelly(
+            bucket_probs=dist.bucket_probabilities,
+            market_prices=market_prices,
+            bankroll=bankroll,
+            kelly_multiplier=kelly_fraction,
+            min_edge=min_edge,
+            position_cap=event_position_cap,
+        )
+
+        for bucket_idx, side, kelly_frac, rec_size in allocations:
+            bucket = event.buckets[bucket_idx]
+            noaa_prob = dist.bucket_probabilities[bucket_idx]
+            edge = noaa_prob - bucket.yes_price
+            abs_edge = abs(edge)
+
+            if abs_edge >= Decimal("0.20"):
+                confidence: str = "high"
+            elif abs_edge >= Decimal("0.15"):
+                confidence = "medium"
+            else:
+                confidence = "low"
+
+            signal = BucketSignal(
+                event_id=event.event_id,
+                bucket_index=bucket_idx,
+                token_id=bucket.token_id,
+                condition_id=bucket.condition_id,
+                outcome_label=bucket.outcome_label,
+                noaa_probability=noaa_prob,
+                market_price=bucket.yes_price,
+                edge=edge,
+                side=side,
+                kelly_fraction=kelly_frac,
+                recommended_size=rec_size,
+                confidence=confidence,  # type: ignore[arg-type]
+                forecast_horizon_days=days_out,
+            )
+            signals.append(signal)
+            logger.info(
+                "bucket_signal_generated",
+                event_id=event.event_id,
+                bucket=bucket.outcome_label,
+                side=side,
+                edge=str(edge),
+                size=str(rec_size),
+            )
+
+    signals.sort(key=lambda s: s.forecast_horizon_days)
+    logger.info(
+        "event_scan_complete",
+        signals_found=len(signals),
+        events_scanned=len(events),
+    )
+    return signals
 
 
 def _normal_cdf(z: float) -> float:
