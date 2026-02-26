@@ -35,6 +35,7 @@ class NOAAClient:
             base_url=NOAA_BASE_URL,
             headers={"User-Agent": USER_AGENT, "Accept": "application/geo+json"},
             timeout=30.0,
+            follow_redirects=True,
         )
         self._grid_cache: dict[str, tuple[str, int, int]] = {}
         self._station_cache: dict[str, str] = {}
