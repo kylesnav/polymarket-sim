@@ -308,7 +308,13 @@ def get_trades_with_context(
                WHERE timestamp >= date(?, ?)"""
     params: list[object] = [now, f"-{days} days"]
 
-    if status:
+    # "ready" and "open" are computed lifecycle labels, not DB status values.
+    # Map them to the underlying DB status and apply lifecycle filtering after.
+    lifecycle_filter: str | None = None
+    if status in ("ready", "open"):
+        lifecycle_filter = status
+        query += " AND status = 'filled'"
+    elif status:
         query += " AND status = ?"
         params.append(status)
     if outcome:
@@ -319,7 +325,12 @@ def get_trades_with_context(
     cursor.execute(query, params)
 
     today = date.today()
-    return [_row_to_context_dict(row, today) for row in cursor.fetchall()]
+    rows = [_row_to_context_dict(row, today) for row in cursor.fetchall()]
+
+    if lifecycle_filter:
+        rows = [r for r in rows if r.get("lifecycle") == lifecycle_filter]
+
+    return rows
 
 
 def get_trade_detail(
@@ -607,9 +618,16 @@ def get_open_positions_with_pnl(conn: sqlite3.Connection) -> dict[str, Any]:
         Dict with "positions" list and "summary" aggregates.
     """
     today = date.today()
+    today_iso = today.isoformat()
     cursor = conn.cursor()
+    # Exclude trades whose event date has passed — those are "ready to resolve",
+    # not open positions.  Trades with no event_date_ctx are kept (conservative).
     cursor.execute(
-        """SELECT * FROM trades WHERE status = 'filled' ORDER BY timestamp DESC"""
+        """SELECT * FROM trades
+           WHERE status = 'filled'
+             AND (event_date_ctx = '' OR event_date_ctx IS NULL OR event_date_ctx >= ?)
+           ORDER BY timestamp DESC""",
+        (today_iso,),
     )
 
     positions: list[dict[str, Any]] = []

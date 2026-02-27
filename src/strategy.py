@@ -137,8 +137,10 @@ def scan_weather_markets(
             )
             continue
 
-        # Forecast horizon filter
-        days_out = max(0, (market.event_date - today).days)
+        # Forecast horizon filter — skip past events and too-far-out events
+        days_out = (market.event_date - today).days
+        if days_out < 0:
+            continue
         if days_out > max_forecast_horizon_days:
             logger.debug(
                 "market_filtered_horizon",
@@ -675,7 +677,9 @@ def scan_weather_events(
     remaining_budget = min(bankroll, max_bankroll)
 
     for event in events:
-        days_out = max(0, (event.event_date - today).days)
+        days_out = (event.event_date - today).days
+        if days_out < 0:
+            continue
         if days_out > max_forecast_horizon_days:
             continue
 

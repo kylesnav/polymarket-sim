@@ -1603,7 +1603,11 @@ function fmtPctPts(v) {
 
 function fmtDate(d) {
   if (!d) return '--';
-  const dt = new Date(d);
+  // Date-only strings (YYYY-MM-DD) are parsed as UTC by JS, which shifts
+  // the displayed date back one day in western time zones. Append T12:00
+  // so it stays on the correct calendar day regardless of local TZ.
+  const s = String(d);
+  const dt = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T12:00') : new Date(s);
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -2391,13 +2395,13 @@ async function loadOpenPositions() {
               <tr>
                 <td style="font-family: var(--font-sans); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(p.question || p.market_id || '--')}</td>
                 <td><span class="badge ${p.side === 'YES' ? 'badge-green' : 'badge-red'}">${p.side}</span></td>
-                <td>${fmtPct(p.price)}</td>
+                <td>${fmtPct(p.entry_price || p.price)}</td>
                 <td>${fmt$(p.size)}</td>
                 <td>${p.noaa_probability ? fmtPct(p.noaa_probability) : '--'}</td>
                 <td class="text-green">${fmt$(p.max_profit || 0)}</td>
                 <td class="text-red">${fmt$(p.max_loss || 0)}</td>
                 <td class="${Number(p.expected_pnl || 0) >= 0 ? 'text-green' : 'text-red'}">${fmt$(p.expected_pnl || 0)}</td>
-                <td>${fmtDate(p.created_at || p.timestamp)}</td>
+                <td>${fmtDate(p.event_date || p.created_at || p.timestamp)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -2478,8 +2482,8 @@ async function loadResolvedTrades() {
           </thead>
           <tbody>
             ${trades.map(t => {
-              const pnl = Number(t.pnl || 0);
-              const won = t.outcome === 'win';
+              const pnl = Number(t.actual_pnl || 0);
+              const won = t.outcome === 'won';
               return `
                 <tr>
                   <td style="font-family: var(--font-sans); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(t.question || t.market_id || '--')}</td>
@@ -2488,7 +2492,7 @@ async function loadResolvedTrades() {
                   <td>${fmt$(t.size)}</td>
                   <td><span class="badge ${won ? 'badge-green' : 'badge-red'}">${t.outcome || '--'}</span></td>
                   <td class="${pnl >= 0 ? 'text-green' : 'text-red'}">${fmt$(pnl)}</td>
-                  <td>${fmtDate(t.resolved_at)}</td>
+                  <td>${fmtDate(t.timestamp)}</td>
                 </tr>
               `;
             }).join('')}
@@ -2505,7 +2509,7 @@ async function resolveTrades() {
   try {
     toast('Resolving trades...', 'info');
     const data = await api('POST', '/api/resolve');
-    const resolved = data.resolved || 0;
+    const resolved = data.resolved_count || 0;
     toast(`Resolved ${resolved} trade(s)`, resolved > 0 ? 'success' : 'info');
     loadPortfolio();
     loadDashboard();

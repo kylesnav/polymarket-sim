@@ -340,14 +340,14 @@ class PolymarketClient:
             return {}
 
         resolution: dict[str, Decimal] = {}
-        all_resolved = True
 
         for market in markets:
             if not isinstance(market, dict):
                 continue
-            # Gamma uses "resolved" field
-            if not market.get("resolved", False):
-                all_resolved = False
+
+            # Gamma returns resolved=None for settled markets;
+            # use closed=True + definitive outcomePrices instead
+            if not market.get("closed", False):
                 continue
 
             outcome_prices_raw: Any = market.get(
@@ -363,6 +363,18 @@ class PolymarketClient:
             if not isinstance(outcome_prices_raw, list) or len(outcome_prices_raw) < 2:
                 continue
 
+            # Require definitive outcome prices (within 0.02 of 0 or 1)
+            try:
+                yes_price = float(outcome_prices_raw[0])
+            except (ValueError, TypeError, IndexError):
+                continue
+
+            if not (abs(yes_price) < 0.02 or abs(yes_price - 1.0) < 0.02):
+                continue
+
+            # Snap to exact 0/1 for clean P&L math
+            snapped_price = Decimal("1") if yes_price > 0.5 else Decimal("0")
+
             # Get token IDs for this market
             clob_token_ids_raw: Any = market.get("clobTokenIds", "")
             if isinstance(clob_token_ids_raw, str):
@@ -372,16 +384,22 @@ class PolymarketClient:
                     clob_token_ids_raw = []
 
             if isinstance(clob_token_ids_raw, list) and len(clob_token_ids_raw) > 0:
-                # YES token is index 0
                 try:
-                    token_id = str(clob_token_ids_raw[0])
-                    final_price = Decimal(str(outcome_prices_raw[0]))
-                    resolution[token_id] = final_price
-                except (IndexError, InvalidOperation):
+                    # YES token is index 0
+                    resolution[str(clob_token_ids_raw[0])] = snapped_price
+                    # NO token is index 1 (complement)
+                    if len(clob_token_ids_raw) > 1:
+                        no_price = Decimal("1") - snapped_price
+                        resolution[str(clob_token_ids_raw[1])] = no_price
+                except IndexError:
                     pass
 
-        if not all_resolved:
-            return {}
+        if resolution:
+            logger.info(
+                "resolution_data_found",
+                event_id=event_id,
+                market_count=len(resolution),
+            )
 
         return resolution
 
@@ -800,16 +818,17 @@ class PolymarketClient:
             except (InvalidOperation, IndexError):
                 continue
 
-            # Get token ID
+            # Get token ID — Gamma API returns clobTokenIds as either
+            # a JSON string or a native list depending on the endpoint
             token_id = ""
             clob_token_ids: Any = market.get("clobTokenIds")
             if isinstance(clob_token_ids, str):
                 try:
-                    ids = json.loads(clob_token_ids)
-                    if isinstance(ids, list) and len(ids) > 0:
-                        token_id = str(ids[0])
+                    clob_token_ids = json.loads(clob_token_ids)
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    clob_token_ids = None
+            if isinstance(clob_token_ids, list) and len(clob_token_ids) > 0:
+                token_id = str(clob_token_ids[0])
 
             try:
                 volume = Decimal(
