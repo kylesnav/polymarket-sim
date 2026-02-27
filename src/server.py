@@ -221,13 +221,12 @@ def _enrich_bucket_signals(
             price = float(d.get("market_price", 0))
             size = float(d.get("recommended_size", 0))
             side = d.get("side", "YES")
-            effective_price = price if side == "YES" else 1.0 - price
-            if effective_price > 0:
-                d["potential_payout"] = round(
-                    size * (1.0 - effective_price) / effective_price, 2
-                )
-            else:
-                d["potential_payout"] = 0.0
+            effective_price = max(
+                price if side == "YES" else 1.0 - price, 0.02
+            )
+            d["potential_payout"] = round(
+                size * (1.0 - effective_price) / effective_price, 2
+            )
         enriched.append(d)
     return enriched
 

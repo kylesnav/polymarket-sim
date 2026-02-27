@@ -630,11 +630,11 @@ def get_open_positions_with_pnl(conn: sqlite3.Connection) -> dict[str, Any]:
         )
         edge = Decimal(str(row["edge"]))
 
-        effective_price = price if side == "YES" else (Decimal("1") - price)
-        if effective_price > 0:
-            max_profit = size * (Decimal("1") - effective_price) / effective_price
-        else:
-            max_profit = Decimal("0")
+        effective_price = max(
+            price if side == "YES" else (Decimal("1") - price),
+            Decimal("0.02"),
+        )
+        max_profit = size * (Decimal("1") - effective_price) / effective_price
         max_loss = -size
 
         # Win probability depends on trade side: YES wins when event occurs,

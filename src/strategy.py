@@ -113,6 +113,7 @@ def scan_weather_markets(
     signals: list[Signal] = []
     today = date.today()
     now = datetime.now(tz=UTC)
+    remaining_budget = min(bankroll, max_bankroll)
 
     for market in markets:
         # Volume filter
@@ -237,6 +238,13 @@ def scan_weather_markets(
             logger.info("bankroll_limit_hit", market_id=market.market_id, reason=reason)
             continue
 
+        # Enforce cumulative budget cap across all signals in this scan
+        if remaining_budget <= Decimal("0"):
+            logger.info("budget_exhausted", market_id=market.market_id)
+            continue
+        if recommended_size > remaining_budget:
+            recommended_size = remaining_budget
+
         # Determine confidence
         abs_edge = abs(edge)
         if abs_edge >= Decimal("0.20"):
@@ -272,6 +280,7 @@ def scan_weather_markets(
             forecast_horizon_days=days_out,
         )
         signals.append(signal)
+        remaining_budget -= recommended_size
         logger.info(
             "signal_generated",
             market_id=market.market_id,
@@ -279,6 +288,7 @@ def scan_weather_markets(
             edge=str(edge),
             size=str(recommended_size),
             horizon_days=days_out,
+            remaining_budget=str(remaining_budget),
         )
 
     # Extreme value rules: evaluate markets that didn't produce a standard signal
@@ -662,6 +672,7 @@ def scan_weather_events(
     signals: list[BucketSignal] = []
     today = date.today()
     event_position_cap = max_bankroll * position_cap_pct
+    remaining_budget = min(bankroll, max_bankroll)
 
     for event in events:
         days_out = max(0, (event.event_date - today).days)
@@ -679,9 +690,33 @@ def scan_weather_events(
 
         market_prices = [b.yes_price for b in event.buckets]
 
+        # Skip buckets with extreme prices (effectively resolved/illiquid)
+        _price_floor = Decimal("0.02")
+        _price_ceil = Decimal("0.98")
+        valid_indices = {
+            i for i, p in enumerate(market_prices)
+            if _price_floor <= p <= _price_ceil
+        }
+        if not valid_indices:
+            logger.debug(
+                "all_buckets_extreme_prices",
+                event_id=event.event_id,
+            )
+            continue
+
+        # Zero out probs/prices for extreme buckets so Kelly skips them
+        filtered_probs = [
+            dist.bucket_probabilities[i] if i in valid_indices else Decimal("0")
+            for i in range(len(market_prices))
+        ]
+        filtered_prices = [
+            market_prices[i] if i in valid_indices else Decimal("0")
+            for i in range(len(market_prices))
+        ]
+
         allocations = calculate_multi_outcome_kelly(
-            bucket_probs=dist.bucket_probabilities,
-            market_prices=market_prices,
+            bucket_probs=filtered_probs,
+            market_prices=filtered_prices,
             bankroll=bankroll,
             kelly_multiplier=kelly_fraction,
             min_edge=min_edge,
@@ -689,6 +724,17 @@ def scan_weather_events(
         )
 
         for bucket_idx, side, kelly_frac, rec_size in allocations:
+            # Enforce cumulative budget cap across all signals
+            if remaining_budget <= Decimal("0"):
+                logger.info(
+                    "budget_exhausted",
+                    event_id=event.event_id,
+                    remaining=str(remaining_budget),
+                )
+                break
+            if rec_size > remaining_budget:
+                rec_size = remaining_budget
+
             bucket = event.buckets[bucket_idx]
             noaa_prob = dist.bucket_probabilities[bucket_idx]
             edge = noaa_prob - bucket.yes_price
@@ -717,6 +763,7 @@ def scan_weather_events(
                 forecast_horizon_days=days_out,
             )
             signals.append(signal)
+            remaining_budget -= rec_size
             logger.info(
                 "bucket_signal_generated",
                 event_id=event.event_id,
@@ -724,6 +771,7 @@ def scan_weather_events(
                 side=side,
                 edge=str(edge),
                 size=str(rec_size),
+                remaining_budget=str(remaining_budget),
             )
 
     signals.sort(key=lambda s: s.forecast_horizon_days)

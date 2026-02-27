@@ -36,7 +36,7 @@ def calculate_kelly(
         logger.warning("noaa_probability_out_of_range", probability=noaa_probability)
         return zero, zero
 
-    if market_price <= zero or market_price >= Decimal("1"):
+    if market_price < Decimal("0.02") or market_price > Decimal("0.98"):
         logger.warning("market_price_out_of_range", price=market_price)
         return zero, zero
 
@@ -114,7 +114,7 @@ def calculate_multi_outcome_kelly(
     for i, (prob, price) in enumerate(zip(bucket_probs, market_prices, strict=True)):
         if prob <= zero or prob >= Decimal("1"):
             continue
-        if price <= zero or price >= Decimal("1"):
+        if price < Decimal("0.02") or price > Decimal("0.98"):
             continue
 
         edge = prob - price

@@ -2154,8 +2154,8 @@ function renderEvents() {
               const mkt = Number(s.market_price || 0);
               const size = Number(s.recommended_size || 0);
               // Potential profit if bet wins
-              const buyPrice = side === 'YES' ? mkt : (1 - mkt);
-              const profit = buyPrice > 0 ? size * (1 - buyPrice) / buyPrice : 0;
+              const buyPrice = Math.max(side === 'YES' ? mkt : (1 - mkt), 0.02);
+              const profit = size * (1 - buyPrice) / buyPrice;
               return `
                 <tr>
                   <td><span class="bet-label" title="${escHtml(label)}">${escHtml(shortLabel)}</span></td>
